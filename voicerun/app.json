@@ -38,6 +38,13 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "The app uses location to track your route.",
+          "locationWhenInUsePermission": "The app uses location to track your route."
+        }
       ]
     ],
     "experiments": {

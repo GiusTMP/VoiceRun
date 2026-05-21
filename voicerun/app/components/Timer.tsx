@@ -54,7 +54,7 @@ export default function Stopwatch({ onStop }: StopwatchProps) {
         <Text style={styles.separator}>:</Text>
         <TimeUnit value={s}/>
       </View>
-      <Text style={styles.separator}>Durata</Text>
+      <Text style={styles.duration}>Duration</Text>
 
       {/* Bottoni */}
 {/*       <View style={styles.buttons}>
@@ -90,7 +90,7 @@ function TimeUnit({ value, }: { value: string;}) {
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection:'column', alignItems: 'center', gap: 32 },
+  container: { flexDirection:'column', alignItems: 'center', paddingBottom: 25},
   display: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   unit: { alignItems: 'center' },
   time: {
@@ -98,14 +98,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontVariant: ['tabular-nums'], // 👈 evita che i numeri "ballino"
     letterSpacing: 2,
+    color: 'white',
   },
   label: { fontSize: 20, fontWeight: '600', opacity: 0.5, letterSpacing: 1 },
-  separator: { fontSize: 64, fontWeight: 'bold', marginBottom: 16 },
-  buttons: { flexDirection: 'row', gap: 12 },
+  separator: { fontSize: 64, fontWeight: 'bold', marginBottom: 2, color: 'white'  },
+  duration: {fontSize: 15, color: 'white', opacity: 0.70 }
+/*   buttons: { flexDirection: 'row', gap: 12 },
   btn: { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
   btnStart: { backgroundColor: '#22c55e' },
   btnStop: { backgroundColor: '#f59e0b' },
   btnReset: { backgroundColor: '#ef4444' },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  btnDisabled: { opacity: 0.4 },
+  btnDisabled: { opacity: 0.4 }, */
 });
