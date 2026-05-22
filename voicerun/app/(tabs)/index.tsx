@@ -1,3 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView from 'react-native-maps';
@@ -10,13 +13,26 @@ import { globalStyles } from "../styles/global";
 
 
 
+
 export default function ActivityScreen() {
+  const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   /* const { position, route, distanceKm, reset } = useTracking(isRunning); */
   const mapRef = useRef<MapView>(null); /* needed reference to call method on the map */
   const region = useUserLocation();
   const [isPaused, setIsPaused] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+  const handleStop = () => {
+    // 👇 Passa i dati alla schermata riepilogo
+    router.push({
+      pathname: '/summary',
+      params: {
+        distanceKm: '5.23',
+        durationSecs: '1820',
+        calories: '312',
+      },
+    });
+  };
 
   useEffect(() => {      
     if (region) {
@@ -28,6 +44,7 @@ export default function ActivityScreen() {
 
   return (
     <View style={globalStyles.container}>
+      <StatusBar style="light" />
       <Image source={require('../../assets/images/logo-app.png')} style={globalStyles.logo} />
       <Timer isRunning={isRunning && !isPaused} resetKey={resetKey}/>
       <View style={styles.runDetails}>
@@ -48,15 +65,26 @@ export default function ActivityScreen() {
           <TouchableOpacity style={styles.startButton} onPress={() => setIsRunning(true)}>
             <Text style={styles.startButtonText}>Start Run</Text>
           </TouchableOpacity>
-        ) : (
+        ) : ( 
+          !isPaused ? (
           <View style={styles.runButtons}>
-            <TouchableOpacity style={styles.circleButton} onPress={() => setIsPaused(!isPaused)}>
-              <Text style={styles.circleButtonText}>⏸</Text>
+            <TouchableOpacity style={styles.circleButtonRestart} onPress={() => setIsPaused(!isPaused)}>
+              <Ionicons name='pause-outline' size={30} color='white' />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => {setIsRunning(false); setIsPaused(false); setResetKey(k => k + 1);}}>
-              <Text style={styles.circleButtonText}>⏹</Text>
+            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => {setIsRunning(false); setIsPaused(false); setResetKey(k => k + 1); handleStop()}}>
+              <Ionicons name='stop' size={30} color='white'/>
             </TouchableOpacity>
           </View>
+          ) : (
+          <View style={styles.runButtons}>
+            <TouchableOpacity style={styles.circleButton} onPress={() => setIsPaused(!isPaused)}>
+              <Ionicons name='play' size={30} color='white' />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => {setIsRunning(false); setIsPaused(false); setResetKey(k => k + 1); handleStop()}}>
+              <Ionicons name='stop' size={30} color='white'/>
+            </TouchableOpacity>
+          </View>
+          )
         )}
       </View>
     </View>
@@ -65,13 +93,13 @@ export default function ActivityScreen() {
 
 const styles = StyleSheet.create({
     runDetails: { flexDirection:'row', alignItems: 'center',gap:20},
-    mapContainer: {  width: '100%', height: 423, position: 'relative'},
-    map: { width: '100%', height: 423 },
+    mapContainer: {  width: '100%', flex: 1, position: 'relative'},
+    map: { width: '100%', flex:1 },
     startButton: {  
       position: 'absolute',
       bottom: 16,
       alignSelf: 'center',
-      backgroundColor: '#FF6B35',
+      backgroundColor: '#1a1a2e',
       paddingVertical: 12,
       paddingHorizontal: 32,
       borderRadius: 25},
@@ -87,11 +115,18 @@ const styles = StyleSheet.create({
       width: 64,
       height: 64,
       borderRadius: 32,
-      backgroundColor: '#FF6B35',
+      backgroundColor: '#1a1a2e',
       justifyContent: 'center',
       alignItems: 'center',
     },
-    stopButton: {backgroundColor: '#CC0000',},
-    circleButtonText: {fontSize: 24,},
+    circleButtonRestart: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: '#1a1a2ec6',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    stopButton: {backgroundColor: '#1a1a2e',},
     },
 );

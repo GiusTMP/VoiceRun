@@ -8,7 +8,7 @@ type Region = {
   longitudeDelta: number;
 };
 
-const INITIAL_ZOOM = { latitudeDelta: 0.003, longitudeDelta: 0.003 };
+const INITIAL_ZOOM = { latitudeDelta: 0.002, longitudeDelta: 0.002 };
 
 export function useUserLocation() {
   const [region, setRegion] = useState<Region | null>(null); /*useState remembers the value at every render*/
