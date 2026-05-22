@@ -4,11 +4,12 @@ import { StyleSheet, Text, View } from 'react-native';
 
 interface StopwatchProps {
   onStop?: (totalSeconds: number) => void;
+  isRunning: boolean;
+  resetKey: number;
 }
 
-export default function Stopwatch({ onStop }: StopwatchProps) {
+export default function Stopwatch({ onStop, isRunning, resetKey }: StopwatchProps) {
   const [totalSeconds, setTotalSeconds] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -23,16 +24,20 @@ export default function Stopwatch({ onStop }: StopwatchProps) {
     };
   }, [isRunning]);
 
-  const handleStartStop = () => {
+  useEffect(() => {
+  setTotalSeconds(0);
+  }, [resetKey]);
+  
+
+/*   const handleStartStop = () => {
     if (isRunning) onStop?.(totalSeconds);
     setIsRunning(prev => !prev);
-  };
+  }; */
 
-  const reset = () => {
+/*   const reset = () => {
     clearInterval(intervalRef.current!);
-    setIsRunning(false);
     setTotalSeconds(0);
-  };
+  };  */
 
   const format = (secs: number) => {
     const h = Math.floor(secs / 3600).toString().padStart(2, '0');
