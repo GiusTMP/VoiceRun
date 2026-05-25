@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView from 'react-native-maps';
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
@@ -10,9 +10,6 @@ import Pace from "../components/Pace";
 import Timer from "../components/Timer";
 import { useUserLocation } from "../hooks/location";
 import { globalStyles } from "../styles/global";
-
-
-
 
 export default function ActivityScreen() {
   const router = useRouter();
@@ -22,16 +19,37 @@ export default function ActivityScreen() {
   const region = useUserLocation();
   const [isPaused, setIsPaused] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+
   const handleStop = () => {
-    // 👇 Passa i dati alla schermata riepilogo
-    router.push({
-      pathname: '/summary',
-      params: {
-        distanceKm: '5.23',
-        durationSecs: '1820',
-        calories: '312',
-      },
-    });
+    Alert.alert(
+      'End activity',
+      'Are you sure you want to finish the activity?',
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          onPress: () => {
+            setIsRunning(false); 
+            setIsPaused(false); 
+            setResetKey(k => k + 1);
+            router.push({
+              pathname: '/summary',
+              params: {
+                distanceKm: '5.23',
+                durationSecs: '1820',
+                calories: '312',
+                refresh: Date.now()
+              },
+            });
+          }
+        }
+      ]
+  
+    )
+    
   };
 
   useEffect(() => {      
@@ -71,7 +89,7 @@ export default function ActivityScreen() {
             <TouchableOpacity style={styles.circleButtonRestart} onPress={() => setIsPaused(!isPaused)}>
               <Ionicons name='pause-outline' size={30} color='white' />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => {setIsRunning(false); setIsPaused(false); setResetKey(k => k + 1); handleStop()}}>
+            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => handleStop()}>
               <Ionicons name='stop' size={30} color='white'/>
             </TouchableOpacity>
           </View>
@@ -80,7 +98,7 @@ export default function ActivityScreen() {
             <TouchableOpacity style={styles.circleButton} onPress={() => setIsPaused(!isPaused)}>
               <Ionicons name='play' size={30} color='white' />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => {setIsRunning(false); setIsPaused(false); setResetKey(k => k + 1); handleStop()}}>
+            <TouchableOpacity style={[styles.circleButton, styles.stopButton]} onPress={() => handleStop()}>
               <Ionicons name='stop' size={30} color='white'/>
             </TouchableOpacity>
           </View>
@@ -92,7 +110,7 @@ export default function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
-    runDetails: { flexDirection:'row', alignItems: 'center',gap:20},
+    runDetails: { flexDirection:'row', alignItems: 'center',gap:20, paddingBottom: 12},
     mapContainer: {  width: '100%', flex: 1, position: 'relative'},
     map: { width: '100%', flex:1 },
     startButton: {  

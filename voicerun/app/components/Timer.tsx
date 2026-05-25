@@ -8,7 +8,7 @@ interface StopwatchProps {
   resetKey: number;
 }
 
-export default function Stopwatch({ onStop, isRunning, resetKey }: StopwatchProps) {
+export default function Stopwatch({isRunning, resetKey }: StopwatchProps) {
   const [totalSeconds, setTotalSeconds] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -27,17 +27,6 @@ export default function Stopwatch({ onStop, isRunning, resetKey }: StopwatchProp
   useEffect(() => {
   setTotalSeconds(0);
   }, [resetKey]);
-  
-
-/*   const handleStartStop = () => {
-    if (isRunning) onStop?.(totalSeconds);
-    setIsRunning(prev => !prev);
-  }; */
-
-/*   const reset = () => {
-    clearInterval(intervalRef.current!);
-    setTotalSeconds(0);
-  };  */
 
   const format = (secs: number) => {
     const h = Math.floor(secs / 3600).toString().padStart(2, '0');
@@ -60,27 +49,6 @@ export default function Stopwatch({ onStop, isRunning, resetKey }: StopwatchProp
         <TimeUnit value={s}/>
       </View>
       <Text style={styles.duration}>Duration</Text>
-
-      {/* Bottoni */}
-{/*       <View style={styles.buttons}>
-        <TouchableOpacity
-          style={[styles.btn, isRunning ? styles.btnStop : styles.btnStart]}
-          onPress={handleStartStop}
-        >
-          <Text style={styles.btnText}>{isRunning ? 'Stop' : 'Avvia'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.btn, styles.btnReset]}
-          onPress={reset}
-          disabled={isRunning}
-        >
-          <Text style={[styles.btnText, isRunning && styles.btnDisabled]}>
-            Reset
-          </Text>
-        </TouchableOpacity>
-      </View> */}
-
     </View>
   );
 }
@@ -108,11 +76,4 @@ const styles = StyleSheet.create({
   label: { fontSize: 20, fontWeight: '600', opacity: 0.5, letterSpacing: 1 },
   separator: { fontSize: 64, fontWeight: 'bold', marginBottom: 2, color: 'white'  },
   duration: {fontSize: 15, color: 'white', opacity: 0.70 }
-/*   buttons: { flexDirection: 'row', gap: 12 },
-  btn: { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
-  btnStart: { backgroundColor: '#22c55e' },
-  btnStop: { backgroundColor: '#f59e0b' },
-  btnReset: { backgroundColor: '#ef4444' },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  btnDisabled: { opacity: 0.4 }, */
 });
