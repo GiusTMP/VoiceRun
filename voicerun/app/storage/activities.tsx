@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Run = {
   id: string;
+  distance: string;
   duration: string;
   calories: string;
   pace: string;
@@ -22,7 +23,7 @@ export const addRun = async (
   const newRun: Run = {
     ...run,
     id: Date.now().toString(),
-    createdAt: new Date().toISOString(),
+    createdAt: new Date().toISOString().split('T')[0],
   };
   await AsyncStorage.setItem(RUN_KEY, JSON.stringify([newRun, ...runs]));
   return newRun;

@@ -67,9 +67,11 @@ export default function AllRunsScreen() {
           runs.map((run) => (
             <RunItem
               key={run.id}
+              distance={run.distance}
               duration={run.duration}
               calories={run.calories}
               pace={run.pace}
+              date={run.createdAt}
             />
           ))
         )}

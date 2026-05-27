@@ -5,16 +5,20 @@ import { colors } from '../styles/global';
 
 // AGGIUNGERE DISTANZA
 type RunItemProps = {
+  distance: string;
   duration: string;
   calories: string;
   pace: string;
+  date: string;
 }
 
 // AGGIUNGERE DISTANZA
 export default function RunItem({ 
+    distance,
     duration,
     calories,
     pace,
+    date,
     }: RunItemProps){
   return (
     <TouchableOpacity style={styles.container}>
@@ -28,7 +32,7 @@ export default function RunItem({
       />
       <View style={styles.info} >
         <Text style={styles.macros}>
-          {calories} cal
+          {date}
         </Text>
         <Text style={styles.dateType}>
           Date
@@ -36,7 +40,7 @@ export default function RunItem({
       </View>
       <View style={styles.info} >
         <Text style={styles.macros}>
-          {duration} 
+          {distance} km
         </Text>
         <Text style={styles.dateType}>
           Distance

@@ -39,8 +39,9 @@ export default function ActivityScreen() {
               pathname: '/summary',
               params: {
                 distanceKm: '5.23',
-                durationSecs: '1820',
+                durationSecs: '00:23:12',
                 calories: '312',
+                pace: '20:10',
                 refresh: Date.now()
               },
             });
