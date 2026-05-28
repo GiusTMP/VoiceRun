@@ -20,14 +20,14 @@ export default function ActivityScreen() {
   const region = useUserLocation();
   const [isPaused, setIsPaused] = useState(false);
   const [resetKey, setResetKey] = useState(0);
-  const durationSecs = '00:56:12';
+  const totalSecondsRef = useRef(0);
   const calories = '312';
   const pace = '20:10';
   const distanceKm = '5.23';
 
   const handleAddRun = async () => {
     await addRun({
-      duration: durationSecs.toString(),
+      duration: totalSecondsRef.current.toString(),
       calories: calories.toString(),
       pace: pace.toString(),
       distance: distanceKm.toString()
@@ -53,7 +53,7 @@ export default function ActivityScreen() {
               pathname: '/summary',
               params: {
                 distanceKm: distanceKm,
-                durationSecs: durationSecs,
+                durationSecs:  totalSecondsRef.current,
                 calories: calories,
                 pace: pace,
                 refresh: Date.now()
@@ -79,7 +79,7 @@ export default function ActivityScreen() {
     <View style={globalStyles.container}>
       <StatusBar style="light" />
       <Image source={require('../../assets/images/logo-app.png')} style={globalStyles.logo} />
-      <Timer isRunning={isRunning && !isPaused} resetKey={resetKey}/>
+      <Timer isRunning={isRunning && !isPaused} resetKey={resetKey} onTick={(secs) => {totalSecondsRef.current = secs;}} / >
       <View style={styles.runDetails}>
         <Distance />
         <Calories />

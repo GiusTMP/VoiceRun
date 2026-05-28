@@ -2,18 +2,25 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, globalStyles } from './styles/global';
+import { formatTimer } from './utils/formatTimer';
 
 export default function SummaryScreen() {
   const router = useRouter();
   const { distanceKm, durationSecs, calories, pace } = useLocalSearchParams();
- 
+  const {h, m, s} = formatTimer(parseInt(durationSecs as string))
   return (
     <View style={styles.container}>
       <Image source={require('../assets/images/logo-app.png')} style={styles.logo} />
       <Text style={globalStyles.title}>Summary</Text>
       <View style={{ height: 1, backgroundColor: 'white', marginVertical: 10, width: '70%', marginTop: 30 }} />
       <View style={styles.containerInfo}>
-        <Text style={styles.info}>{durationSecs}</Text>
+        <View style={styles.display}>
+          <TimeUnit value={h}/>
+          <Text style={styles.separator}>:</Text>
+          <TimeUnit value={m}/>
+          <Text style={styles.separator}>:</Text>
+          <TimeUnit value={s}/>
+        </View>
         <Text style={styles.infoTitle}>Duration</Text>
         <Text style={styles.info}>{distanceKm} km</Text>
         <Text style={styles.infoTitle}>Distance</Text>
@@ -32,6 +39,14 @@ export default function SummaryScreen() {
   );
 }
 
+function TimeUnit({ value }: { value: string }) {
+  return (
+    <View style={styles.unit}>
+      <Text style={styles.info}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -43,7 +58,9 @@ const styles = StyleSheet.create({
   logo: {
     marginBottom: 20
   },
-
+  unit: { alignItems: 'center' },
+  display: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  separator: { fontSize: 30, fontWeight: 'bold', marginBottom: 2, color: 'white' },
   containerInfo:{
     marginTop: 20,
     flexDirection: 'column',
