@@ -10,6 +10,7 @@ type RunItemProps = {
   calories: string;
   pace: string;
   date: string;
+  onPress?: () => void;
 }
 
 // AGGIUNGERE DISTANZA
@@ -19,9 +20,10 @@ export default function RunItem({
     calories,
     pace,
     date,
+    onPress
     }: RunItemProps){
   return (
-    <TouchableOpacity style={styles.container}>
+    <TouchableOpacity style={styles.container} onPress={onPress}>
       <Image
           source={require('../../assets/images/run-history.png')}
           style={{

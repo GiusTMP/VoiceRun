@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RunItem from '../components/RunItem';
@@ -9,6 +9,8 @@ import { colors, globalStyles } from '../styles/global';
 export default function AllRunsScreen() {
   const [runs, setRuns] = useState<Run[]>([]);
   const { refresh } = useLocalSearchParams();
+  const router = useRouter();
+
 
 
   const loadRuns = async () => {
@@ -72,6 +74,15 @@ export default function AllRunsScreen() {
               calories={run.calories}
               pace={run.pace}
               date={run.createdAt}
+              onPress={() => router.push({
+              pathname: '/summary',
+              params: {
+                distanceKm: run.distance,
+                durationSecs: run.duration,
+                calories: run.calories,
+                pace: run.pace,
+              },
+            })}
             />
           ))
         )}

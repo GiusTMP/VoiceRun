@@ -1,21 +1,11 @@
 // app/summary.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { addRun } from './storage/activities';
 import { colors, globalStyles } from './styles/global';
 
 export default function SummaryScreen() {
   const router = useRouter();
   const { distanceKm, durationSecs, calories, pace } = useLocalSearchParams();
-  
-  const handleAddRun = async () => {
-     await addRun({
-    duration: durationSecs.toString(),
-    calories: calories.toString(),
-    pace: pace.toString(),
-    distance: distanceKm.toString()
-    });
-  }
  
   return (
     <View style={styles.container}>
@@ -35,7 +25,7 @@ export default function SummaryScreen() {
       {/* Torna alla home */}
       <View style={{ height: 1, backgroundColor: 'white', marginVertical: 10, width: '70%', marginBottom: 50 }} />
 
-      <TouchableOpacity style={styles.button} onPress={() => {handleAddRun(); router.replace('/history')}}>
+      <TouchableOpacity style={styles.button} onPress={() => {router.replace('/history')}}>
         <Text style={{color:'white', fontWeight: 'bold'}}>Done</Text>
       </TouchableOpacity>
     </View>

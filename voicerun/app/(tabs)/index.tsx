@@ -9,6 +9,7 @@ import Distance from "../components/Distance";
 import Pace from "../components/Pace";
 import Timer from "../components/Timer";
 import { useUserLocation } from "../hooks/location";
+import { addRun } from '../storage/activities';
 import { globalStyles } from "../styles/global";
 
 export default function ActivityScreen() {
@@ -19,7 +20,19 @@ export default function ActivityScreen() {
   const region = useUserLocation();
   const [isPaused, setIsPaused] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+  const durationSecs = '00:56:12';
+  const calories = '312';
+  const pace = '20:10';
+  const distanceKm = '5.23';
 
+  const handleAddRun = async () => {
+    await addRun({
+      duration: durationSecs.toString(),
+      calories: calories.toString(),
+      pace: pace.toString(),
+      distance: distanceKm.toString()
+      });
+  }
   const handleStop = () => {
     Alert.alert(
       'End activity',
@@ -35,13 +48,14 @@ export default function ActivityScreen() {
             setIsRunning(false); 
             setIsPaused(false); 
             setResetKey(k => k + 1);
+            handleAddRun();
             router.push({
               pathname: '/summary',
               params: {
-                distanceKm: '5.23',
-                durationSecs: '00:23:12',
-                calories: '312',
-                pace: '20:10',
+                distanceKm: distanceKm,
+                durationSecs: durationSecs,
+                calories: calories,
+                pace: pace,
                 refresh: Date.now()
               },
             });
