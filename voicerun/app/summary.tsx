@@ -24,7 +24,7 @@ export default function SummaryScreen() {
         <Text style={styles.infoTitle}>Duration</Text>
         <Text style={styles.info}>{distanceKm} km</Text>
         <Text style={styles.infoTitle}>Distance</Text>
-        <Text style={styles.info}>{pace} /km</Text>
+        <Text style={styles.info}>{pace} min/km</Text>
         <Text style={styles.infoTitle}>Pace</Text>
         <Text style={styles.info}>{calories} Kcal</Text>
         <Text style={styles.infoTitle}>Calories</Text>

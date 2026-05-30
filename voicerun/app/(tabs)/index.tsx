@@ -1,35 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import MapView from 'react-native-maps';
+import { useRef, useState } from 'react';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+/*import MapView from 'react-native-maps';*/
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
 import Pace from "../components/Pace";
 import Timer from "../components/Timer";
-import { useUserLocation } from "../hooks/location";
+/*import { useUserLocation } from "../hooks/location";*/
+import ActivityMap from "../components/ActivityMap";
+import { useTracking } from "../hooks/useTracking";
 import { addRun } from '../storage/activities';
 import { globalStyles } from "../styles/global";
+import { formatTimer } from '../utils/formatTimer';
 
 export default function ActivityScreen() {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
-  /* const { position, route, distanceKm, reset } = useTracking(isRunning); */
-  const mapRef = useRef<MapView>(null); /* needed reference to call method on the map */
-  const region = useUserLocation();
   const [isPaused, setIsPaused] = useState(false);
+  const { position, route, distanceKm} = useTracking(isRunning && !isPaused); 
+  /*const mapRef = useRef<MapView>(null);*/ /* needed reference to call method on the map */
+  /*const region = useUserLocation();*/
   const [resetKey, setResetKey] = useState(0);
   const totalSecondsRef = useRef(0);
-  const calories = '312';
-  const pace = '20:10';
-  const distanceKm = '5.23';
+  const calories = (0.9*80*distanceKm);
+  const paceSecs = distanceKm > 0 ? Math.floor(totalSecondsRef.current / distanceKm) : 0;
+  const {m,s} = formatTimer(paceSecs)
+  const finalPace = m+ ":" + s;
+  /*const distanceKm = '5.23';*/
 
   const handleAddRun = async () => {
     await addRun({
       duration: totalSecondsRef.current.toString(),
       calories: calories.toString(),
-      pace: pace.toString(),
+      pace: finalPace,
       distance: distanceKm.toString()
       });
   }
@@ -52,10 +57,10 @@ export default function ActivityScreen() {
             router.push({
               pathname: '/summary',
               params: {
-                distanceKm: distanceKm,
+                distanceKm: distanceKm.toFixed(2),
                 durationSecs:  totalSecondsRef.current,
-                calories: calories,
-                pace: pace,
+                calories: calories.toFixed(0),
+                pace: finalPace,
                 refresh: Date.now()
               },
             });
@@ -67,33 +72,19 @@ export default function ActivityScreen() {
     
   };
 
-  useEffect(() => {      
-    if (region) {
-      mapRef.current?.animateToRegion(region, 500);
-    }
-  }, [region]);
-
-  if (!region) return <ActivityIndicator size="large" />; /* spinning wheel for loading */
-
   return (
     <View style={globalStyles.container}>
       <StatusBar style="light" />
       <Image source={require('../../assets/images/logo-app.png')} style={globalStyles.logo} />
-      <Timer isRunning={isRunning && !isPaused} resetKey={resetKey} onTick={(secs) => {totalSecondsRef.current = secs;}} / >
+      <Timer isRunning={isRunning && !isPaused} resetKey={resetKey} onTick={(secs) => {totalSecondsRef.current = secs;}} />
       <View style={styles.runDetails}>
-        <Distance />
-        <Calories />
-        <Pace />
+        <Distance distanceKm={distanceKm} />
+        <Calories calories={calories}/>
+        <Pace pace={finalPace}/>
       </View>
       {/* <ActivityMap position={position} route={route} distanceKm={distanceKm} /> */}
       <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef} /* to update */
-          style={styles.map}
-          initialRegion={region}
-          showsUserLocation
-          showsMyLocationButton
-        />
+        <ActivityMap position={position} route={route} distanceKm={distanceKm} />
         {!isRunning ? (
           <TouchableOpacity style={styles.startButton} onPress={() => setIsRunning(true)}>
             <Text style={styles.startButtonText}>Start Run</Text>
@@ -163,3 +154,18 @@ const styles = StyleSheet.create({
     stopButton: {backgroundColor: '#1a1a2e',},
     },
 );
+
+/*        <MapView
+          ref={mapRef} /* to update */
+          /*style={styles.map}
+          initialRegion={region}
+          showsUserLocation
+          showsMyLocationButton
+        />*/
+
+
+
+
+
+
+

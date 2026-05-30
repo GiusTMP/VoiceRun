@@ -42,7 +42,7 @@ export default function RunItem({
       </View>
       <View style={styles.info} >
         <Text style={styles.macros}>
-          {distance} km
+          {parseFloat(distance).toFixed(2)} km
         </Text>
         <Text style={styles.dateType}>
           Distance

@@ -66,8 +66,12 @@ export function useTracking(isRunning: boolean) {
         setRoute((prev) => {
           if (prev.length > 0) {
             const added = haversine(prev[prev.length - 1], newCoord);
-            setDistanceKm((d) => d + added);
-          }
+            if (added > 0.005) { //ignore updates smaller than 5 meters
+              setDistanceKm((d) => d + added);
+              return [...prev, newCoord];
+            }
+            return prev;
+          } 
           return [...prev, newCoord];
         });
       }

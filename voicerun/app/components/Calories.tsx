@@ -1,11 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function Calories() {
+interface Props {
+  calories: number;
+}
+
+export default function Calories({ calories }: Props) {
     
 
     return (
         <View style={styles.container}>
-        <Text style={styles.value}>000</Text>
+        <Text style={styles.value}>{calories.toFixed(0)}</Text>
         <Text style={styles.calories}>Calories (kcal)</Text>
         </View>
     );

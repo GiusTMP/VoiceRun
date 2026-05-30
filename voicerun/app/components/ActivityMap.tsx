@@ -45,11 +45,6 @@ export default function ActivityMap({ position, route, distanceKm }: Props) {
           <Marker coordinate={route[0]} title="Partenza" pinColor="blue" />
         )}
       </MapView>
-
-      {/* Badge km sovrapposto alla mappa */}
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{distanceKm.toFixed(2)} km</Text>
-      </View>
     </View>
   );
 }

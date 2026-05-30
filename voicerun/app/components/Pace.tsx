@@ -1,9 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function Pace() {
+interface Props {
+  pace: string;
+}
+
+export default function Pace({pace}: Props) {
     return (
         <View style={styles.container}>
-            <Text style={styles.value}>00:00</Text>
+            <Text style={styles.value}>{pace}</Text>
             <Text style={styles.pace}>Pace (min/km)</Text>
         </View>
     );

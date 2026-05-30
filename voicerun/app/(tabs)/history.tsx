@@ -77,9 +77,9 @@ export default function AllRunsScreen() {
               onPress={() => router.push({
               pathname: '/summary',
               params: {
-                distanceKm: run.distance,
+                distanceKm: parseFloat(run.distance).toFixed(2),
                 durationSecs: run.duration,
-                calories: run.calories,
+                calories: parseFloat(run.calories).toFixed(0),
                 pace: run.pace,
               },
             })}

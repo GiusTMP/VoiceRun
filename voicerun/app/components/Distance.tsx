@@ -1,11 +1,16 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function Distance() {
+interface Props {
+  distanceKm: number;
+}
+
+
+export default function Distance({ distanceKm }: Props) {
     
 
     return (
         <View style={styles.container}>
-        <Text style={styles.value}>0.00</Text>
+        <Text style={styles.value}>{distanceKm.toFixed(2)}</Text>
         <Text style={styles.distance}>Distance (km)</Text>
         </View>
     );
