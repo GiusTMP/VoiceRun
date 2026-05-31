@@ -12,6 +12,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo install react-native-maps expo-location
    npx expo install expo-status-bar
    npx expo install @react-native-async-storage/async-storage
+   npx expo install expo-speech
 
 2. Start the app
 

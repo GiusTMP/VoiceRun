@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-/*import MapView from 'react-native-maps';*/
+import ActivityMap from "../components/ActivityMap";
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
 import Pace from "../components/Pace";
 import Timer from "../components/Timer";
-/*import { useUserLocation } from "../hooks/location";*/
-import ActivityMap from "../components/ActivityMap";
 import { useTracking } from "../hooks/useTracking";
 import { addRun } from '../storage/activities';
 import { globalStyles } from "../styles/global";
@@ -20,15 +19,21 @@ export default function ActivityScreen() {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const { position, route, distanceKm} = useTracking(isRunning && !isPaused); 
-  /*const mapRef = useRef<MapView>(null);*/ /* needed reference to call method on the map */
-  /*const region = useUserLocation();*/
   const [resetKey, setResetKey] = useState(0);
   const totalSecondsRef = useRef(0);
   const calories = (0.9*80*distanceKm);
   const paceSecs = distanceKm > 0 ? Math.floor(totalSecondsRef.current / distanceKm) : 0;
   const {m,s} = formatTimer(paceSecs)
   const finalPace = m+ ":" + s;
-  /*const distanceKm = '5.23';*/
+  const announcedKmRef = useRef(0);
+
+  useEffect(() => {
+  const km = Math.floor(distanceKm);
+  if (km > announcedKmRef.current) {
+    announcedKmRef.current = km;
+    Speech.speak(km + ' km. Pace: ' + finalPace);
+    }
+  }, [distanceKm]);
 
   const handleAddRun = async () => {
     await addRun({
@@ -154,14 +159,6 @@ const styles = StyleSheet.create({
     stopButton: {backgroundColor: '#1a1a2e',},
     },
 );
-
-/*        <MapView
-          ref={mapRef} /* to update */
-          /*style={styles.map}
-          initialRegion={region}
-          showsUserLocation
-          showsMyLocationButton
-        />*/
 
 
 
