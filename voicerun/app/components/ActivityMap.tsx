@@ -13,7 +13,7 @@ export default function ActivityMap({ position, route, distanceKm }: Props) {
   if (!position) {
     return (
       <View style={styles.placeholder}>
-        <Text>Acquisizione GPS...</Text>
+        <Text style={{color: 'white'}}>Acquisizione GPS...</Text>
       </View>
     );
   }

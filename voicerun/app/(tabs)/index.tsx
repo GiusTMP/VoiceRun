@@ -3,13 +3,15 @@ import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
 import ActivityMap from "../components/ActivityMap";
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
 import Pace from "../components/Pace";
 import Timer from "../components/Timer";
+import VoiceMicButton from "../components/VoiceMicButton"; // 👈 Nuovo Import
 import { useTracking } from "../hooks/useTracking";
+import { useVoiceController } from "../hooks/useVoiceController"; // 👈 Nuovo Import
 import { addRun } from '../storage/activities';
 import { globalStyles } from "../styles/global";
 import { formatTimer } from '../utils/formatTimer';
@@ -20,6 +22,7 @@ export default function ActivityScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const { position, route, distanceKm} = useTracking(isRunning && !isPaused); 
   const [resetKey, setResetKey] = useState(0);
+  const [currentSeconds, setCurrentSeconds] = useState(0); // Passato all'hook vocale
   const totalSecondsRef = useRef(0);
   const calories = (0.9*80*distanceKm);
   const paceSecs = distanceKm > 0 ? Math.floor(totalSecondsRef.current / distanceKm) : 0;
@@ -28,10 +31,11 @@ export default function ActivityScreen() {
   const announcedKmRef = useRef(0);
 
   useEffect(() => {
-  const km = Math.floor(distanceKm);
-  if (km > announcedKmRef.current) {
-    announcedKmRef.current = km;
-    Speech.speak(km + ' km. Pace: ' + finalPace);
+    const km = Math.floor(distanceKm);
+    if (km > announcedKmRef.current) {
+      announcedKmRef.current = km;
+      // Added English localization and better formatting
+      Speech.speak(`${km} kilometers. Pace: ${finalPace}`, { language: 'en-US' });
     }
   }, [distanceKm]);
 
@@ -43,55 +47,79 @@ export default function ActivityScreen() {
       distance: distanceKm.toString()
       });
   }
+  const confirmStopActivity = () => {
+    setIsRunning(false); 
+    setIsPaused(false); 
+    setResetKey(k => k + 1);
+    handleAddRun();
+    router.push({
+      pathname: '/summary',
+      params: {
+        distanceKm: distanceKm.toFixed(2),
+        durationSecs:  totalSecondsRef.current,
+        calories: calories.toFixed(0),
+        pace: finalPace,
+        refresh: Date.now()
+      },
+    });
+  };
   const handleStop = () => {
     Alert.alert(
       'End activity',
       'Are you sure you want to finish the activity?',
       [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
-          onPress: () => {
-            setIsRunning(false); 
-            setIsPaused(false); 
-            setResetKey(k => k + 1);
-            handleAddRun();
-            router.push({
-              pathname: '/summary',
-              params: {
-                distanceKm: distanceKm.toFixed(2),
-                durationSecs:  totalSecondsRef.current,
-                calories: calories.toFixed(0),
-                pace: finalPace,
-                refresh: Date.now()
-              },
-            });
-          }
-        }
+        { text: 'No', style: 'cancel' },
+        { text: 'Yes', onPress: () => confirmStopActivity() } // Usa la funzione pura
       ]
-  
     )
-    
   };
+
+  // 👈 INTEGRAZIONE HOOK VOCALE
+  const { isAwake, isListening, startListening } = useVoiceController({
+    isRunning,
+    isPaused,
+    setIsRunning,
+    setIsPaused,
+    confirmStop: confirmStopActivity, // <-- Modificato: non passiamo più l'Alert!
+    distanceKm,
+    calories,
+    finalPace,
+    totalSeconds: currentSeconds,
+  });
 
   return (
     <View style={globalStyles.container}>
       <StatusBar style="light" />
       <Image source={require('../../assets/images/logo-app.png')} style={globalStyles.logo} />
-      <Timer isRunning={isRunning && !isPaused} resetKey={resetKey} onTick={(secs) => {totalSecondsRef.current = secs;}} />
+      <Timer 
+        isRunning={isRunning && !isPaused} 
+        resetKey={resetKey} 
+        onTick={(secs) => {
+          totalSecondsRef.current = secs;
+          setCurrentSeconds(secs); // Sincronizza lo stato locale per i comandi vocali
+        }} 
+      />
       <View style={styles.runDetails}>
         <Distance distanceKm={distanceKm} />
         <Calories calories={calories}/>
         <Pace pace={finalPace}/>
       </View>
-      {/* <ActivityMap position={position} route={route} distanceKm={distanceKm} /> */}
+      
       <View style={styles.mapContainer}>
         <ActivityMap position={position} route={route} distanceKm={distanceKm} />
+        
+        {/* 👈 COMPONENTE MICROFONO IN BASSO A DESTRA */}
+        <VoiceMicButton 
+          isAwake={isAwake} 
+          isListening={isListening} 
+          onPress={() => {
+            // Se per caso si spegne l'ascolto di background, l'utente può cliccarlo manualmente
+            startListening();
+          }}
+        />
+
         {!isRunning ? (
-          <TouchableOpacity style={styles.startButton} onPress={() => setIsRunning(true)}>
+          <TouchableOpacity style={styles.startButton} onPress={() => {setIsRunning(true); Speech.speak('Run started', {language: 'en-US'}); Vibration.vibrate(1000);} }>
             <Text style={styles.startButtonText}>Start Run</Text>
           </TouchableOpacity>
         ) : ( 
@@ -159,10 +187,3 @@ const styles = StyleSheet.create({
     stopButton: {backgroundColor: '#1a1a2e',},
     },
 );
-
-
-
-
-
-
-
