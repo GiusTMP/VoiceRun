@@ -1,7 +1,8 @@
-import { useFocusEffect } from 'expo-router'; // <-- NUOVO IMPORT
+import { useFocusEffect } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { useCallback, useEffect, useRef, useState } from 'react'; // <-- AGGIUNTO useCallback
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Vibration } from 'react-native';
 import { formatTimer } from '../utils/formatTimer';
 
 interface VoiceControllerProps {
@@ -14,7 +15,22 @@ interface VoiceControllerProps {
   calories: number;
   finalPace: string;
   totalSeconds: number;
+  
 }
+
+const INTENTS = {
+  START: /start|begin|let's go|go for a run/i,
+  PAUSE: /pause|hold on|take a break|suspend/i,
+  RESUME: /resume|continue|go on|keep going/i,
+  STOP: /stop|finish|end run|call it a day|terminate/i,
+  DISTANCE: /distance|how far|kilometers|km|meters/i,
+  TIME: /time|duration|how long|timer|clock/i,
+  CALORIES: /calories|burned|fat|kcal|energy/i,
+  PACE: /pace|rhythm|speed|how fast/i,
+};
+
+const CONFIRM_YES = /yes|yeah|sure|confirm|do it|ok/i;
+const CONFIRM_NO = /no|cancel|dont|don't|keep running/i;
 
 export function useVoiceController({
   isRunning,
@@ -27,21 +43,18 @@ export function useVoiceController({
   finalPace,
   totalSeconds,
 }: VoiceControllerProps) {
-  const [isAwakeState, setIsAwakeState] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [volume, setVolume] = useState(0); 
   
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shouldListenRef = useRef(false); // Di base spento finché non è a focus
+  const shouldListenRef = useRef(false);
   const lastProcessedTextRef = useRef('');
   
-  // LUCCHETTI
   const isStartingRef = useRef(false); 
   const isSpeakingRef = useRef(false); 
   const isListeningRef = useRef(false); 
   const isConfirmingStopRef = useRef(false);
 
-  const isAwakeRef = useRef(false);
   const isRunningRef = useRef(isRunning);
   const isPausedRef = useRef(isPaused);
   const distanceKmRef = useRef(distanceKm);
@@ -56,45 +69,33 @@ export function useVoiceController({
   useEffect(() => { finalPaceRef.current = finalPace; }, [finalPace]);
   useEffect(() => { totalSecondsRef.current = totalSeconds; }, [totalSeconds]);
 
-  const setIsAwake = (val: boolean) => {
-    setIsAwakeState(val);
-    isAwakeRef.current = val;
-    if (!val) isConfirmingStopRef.current = false; 
-  };
-
-  const resetAwakeTimeout = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setIsAwake(false);
-      lastProcessedTextRef.current = '';
-    }, 15000);
+  const getParsedIntent = (text: string): keyof typeof INTENTS | null => {
+    for (const [intent, regex] of Object.entries(INTENTS)) {
+      if (regex.test(text)) return intent as keyof typeof INTENTS;
+    }
+    return null;
   };
 
   const speakSafe = (text: string) => {
     if (isSpeakingRef.current) return;
     isSpeakingRef.current = true;
+    setVolume(0); 
     
-    // Non forzare shouldListenRef a false qui, altrimenti rompiamo il focus.
-    // Lo fermiamo solo a livello di sensore nativo.
     ExpoSpeechRecognitionModule.stop();
 
     setTimeout(() => {
       Speech.speak(text, {
         language: 'en-US',
-        onDone: () => {
-          isSpeakingRef.current = false;
-          setTimeout(() => startListening(), 800);
-        },
-        onStopped: () => {
-          isSpeakingRef.current = false;
-          setTimeout(() => startListening(), 800);
-        },
-        onError: () => {
-          isSpeakingRef.current = false;
-          setTimeout(() => startListening(), 800);
-        }
+        onDone: () => resumeListeningAfterSpeech(),
+        onStopped: () => resumeListeningAfterSpeech(),
+        onError: () => resumeListeningAfterSpeech()
       });
-    }, 300); 
+    }, 50);
+  };
+
+  const resumeListeningAfterSpeech = () => {
+    isSpeakingRef.current = false;
+    setTimeout(() => startListening(), 150); 
   };
 
   useSpeechRecognitionEvent('start', () => {
@@ -106,9 +107,9 @@ export function useVoiceController({
   useSpeechRecognitionEvent('end', () => {
     setIsListening(false);
     isListeningRef.current = false;
-    
+    setVolume(0); 
     if (shouldListenRef.current && !isSpeakingRef.current && !isStartingRef.current) {
-      setTimeout(() => startListening(), 1000);
+      setTimeout(() => startListening(), 150); 
     }
   });
   
@@ -116,124 +117,139 @@ export function useVoiceController({
     setIsListening(false);
     isListeningRef.current = false;
     isStartingRef.current = false;
+    setVolume(0); 
 
     const ignoredErrors = ['other', 'no-speech', 'aborted'];
-    const delay = ignoredErrors.includes(event.error) ? 1500 : 3000;
+    const delay = ignoredErrors.includes(event.error) ? 300 : 1500;
     
     if (shouldListenRef.current && !isSpeakingRef.current) {
       setTimeout(() => startListening(), delay); 
     }
   });
+
+  useSpeechRecognitionEvent('volumechange', (event) => {
+    if (isSpeakingRef.current) {
+      setVolume(0);
+      return;
+    }
+    const rawValue = event.value || 0;
+    setVolume(rawValue * 2);
+  });
   
   useSpeechRecognitionEvent('result', (event) => {
-    // 🛡️ SCUDO ANTI-FANTASMA: Se la schermata non è a fuoco, ignora TUTTO!
-    if (!shouldListenRef.current) return;
-    
-    if (isSpeakingRef.current) return;
+    if (!shouldListenRef.current || isSpeakingRef.current) return;
 
-    const results = event.results;
-    const latestResult = results[results.length - 1];
-    const text = latestResult?.transcript?.toLowerCase().trim() || '';
-    
+    // Normalizziamo il testo per sicurezza
+    let text = event.results[event.results.length - 1]?.transcript?.toLowerCase().trim() || '';
     setTranscript(text);
 
     if (!text || text === lastProcessedTextRef.current) return;
 
-    if (!isAwakeRef.current) {
-      if (text.includes('hey run') || text.includes('wake up')) {
+    // SOTTO-STATO: Risposta diretta per la conferma di interruzione corsa 
+    // (Qui NON serve dire "Voicerun", l'utente può rispondere in modo naturale)
+    if (isConfirmingStopRef.current) {
+      if (CONFIRM_YES.test(text)) {
         lastProcessedTextRef.current = text;
-        setIsAwake(true);
-        speakSafe("I'm listening");
-        resetAwakeTimeout();
+        isConfirmingStopRef.current = false;
+        speakSafe('Activity terminated');
+        confirmStop(); 
+      } else if (CONFIRM_NO.test(text)) {
+        lastProcessedTextRef.current = text;
+        isConfirmingStopRef.current = false;
+        speakSafe('Tracking continued');
       }
-      return;
+      return; 
     }
 
-    if (isAwakeRef.current) {
-      resetAwakeTimeout();
+    // 🔴 FILTRO PRINCIPALE: LA FRASE DEVE INIZIARE CON "VOICERUN"
+    // Spesso i motori di riconoscimento scrivono "voice run" separato. Normalizziamolo.
+    if (text.startsWith('voice run')) {
+      text = text.replace('voice run', 'voicerun');
+    }
 
-      if (isConfirmingStopRef.current) {
-        if (text.includes('yes') || text.includes('yeah') || text.includes('sure') || text.includes('confirm')) {
-          lastProcessedTextRef.current = text;
-          isConfirmingStopRef.current = false;
-          speakSafe('Activity terminated');
-          setIsAwake(false);
-          confirmStop(); 
-        } 
-        else if (text.includes('no') || text.includes('cancel') || text.includes('resume')) {
-          lastProcessedTextRef.current = text;
-          isConfirmingStopRef.current = false;
-          speakSafe('Tracking continued');
-        }
-        return; 
-      }
+    // Se non inizia per voicerun, ignoriamo tutto (es. tosse, parlate con amici, ecc)
+    if (!text.startsWith('voicerun')) {
+      return; 
+    }
 
-      if (text.includes('start') || text.includes('begin')) {
-        lastProcessedTextRef.current = text;
+    // Puliamo la stringa tenendo solo il comando utile (es. "Voicerun how far" -> "how far")
+    const commandText = text.replace('voicerun', '').trim();
+
+    // Troviamo l'intento dentro al resto della frase
+    const intent = getParsedIntent(commandText);
+    if (!intent) return; 
+
+    // Salviamo il testo completo come ultimo processato per evitare duplicati
+    lastProcessedTextRef.current = text;
+
+    switch (intent) {
+      case 'START':
         if (!isRunningRef.current) {
           setIsRunning(true);
+          Vibration.vibrate(1000);
           speakSafe('Run started');
+        } else {
+          speakSafe('The run is already active');
         }
-        setIsAwake(false);
-      }
-      else if (text.includes('pause') || text.includes('suspend')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'PAUSE':
         if (isRunningRef.current && !isPausedRef.current) {
           setIsPaused(true);
+          Vibration.vibrate(100);
           speakSafe('Run paused');
+        } else {
+          speakSafe('The tracking cannot be paused right now');
         }
-        setIsAwake(false);
-      }
-      else if (text.includes('resume') || text.includes('continue')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'RESUME':
         if (isRunningRef.current && isPausedRef.current) {
           setIsPaused(false);
+          Vibration.vibrate(100);
           speakSafe('Run resumed');
+        } else {
+          speakSafe('The tracking is already active');
         }
-        setIsAwake(false);
-      }
-      else if (text.includes('stop') || text.includes('finish') || text.includes('end run')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'STOP':
         if (isRunningRef.current) {
           isConfirmingStopRef.current = true; 
           speakSafe('Are you sure you want to finish? Say yes to confirm, or no to cancel.');
-          resetAwakeTimeout(); 
+        } else {
+          speakSafe('No active activity to stop');
         }
-      }
-      else if (text.includes('time') || text.includes('duration')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'TIME':
         const { h, m, s } = formatTimer(totalSecondsRef.current);
         const speechTime = parseInt(h) > 0 
           ? `${parseInt(h)} hours, ${parseInt(m)} minutes and ${parseInt(s)} seconds`
           : `${parseInt(m)} minutes and ${parseInt(s)} seconds`;
         speakSafe(`Time elapsed: ${speechTime}`);
-        setIsAwake(false);
-      }
-      else if (text.includes('distance') || text.includes('kilometers')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'DISTANCE':
         speakSafe(`You have run ${distanceKmRef.current.toFixed(2)} kilometers`);
-        setIsAwake(false);
-      }
-      else if (text.includes('calories') || text.includes('burned')) {
-        lastProcessedTextRef.current = text;
-        speakSafe(`You have burned ${caloriesRef.current.toFixed(0)} calories`);
-        setIsAwake(false);
-      }
-      else if (text.includes('pace') || text.includes('rhythm')) {
-        lastProcessedTextRef.current = text;
+        break;
+
+      case 'CALORIES':
+        speakSafe(`You have burn ${caloriesRef.current.toFixed(0)} calories`);
+        break;
+
+      case 'PACE':
         const paceParts = finalPaceRef.current.split(':');
         const paceSpeech = paceParts.length === 2 
           ? `${parseInt(paceParts[0])} minutes and ${parseInt(paceParts[1])} seconds per kilometer`
           : 'Pace not available';
         speakSafe(`Your current pace is ${paceSpeech}`);
-        setIsAwake(false);
-      }
+        break;
     }
   });
 
   const startListening = async () => {
     if (!shouldListenRef.current || isStartingRef.current || isSpeakingRef.current || isListeningRef.current) return;
-    
     isStartingRef.current = true; 
 
     try {
@@ -245,8 +261,8 @@ export function useVoiceController({
           interimResults: true,
           androidIntentOptions: {
             EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 10000,
-            EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 5000,
-            EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+            EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 4000,
+            EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2000,
           },
         });
       } else {
@@ -258,31 +274,26 @@ export function useVoiceController({
     }
   };
 
-  // 🛡️ GESTIONE DEL FOCUS: Avvia/Arresta in base alla schermata visibile
   useFocusEffect(
     useCallback(() => {
-      // Quando la schermata DIVENTA VISIBILE
       shouldListenRef.current = true;
       isStartingRef.current = false;
-      isConfirmingStopRef.current = false; // Reset dello stato di stop
+      isConfirmingStopRef.current = false;
       lastProcessedTextRef.current = '';
-      setIsAwakeState(false);
-      isAwakeRef.current = false;
 
       startListening();
 
-      // Quando la schermata VIENE NASCOSTA (es. vai su summary)
       return () => {
         shouldListenRef.current = false;
         ExpoSpeechRecognitionModule.stop();
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
       };
     }, [])
   );
 
   return {
     isListening,
-    isAwake: isAwakeState,
+    isAwake: isConfirmingStopRef.current, 
+    volume, 
     transcript,
     speakSafe, 
     startListening, 
