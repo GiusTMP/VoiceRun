@@ -116,13 +116,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   highlight: {
-    color: '#00ffcc',
+    color: '#4fc3f7',
     fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#00ffcc',
+    color: '#4fc3f7',
     marginTop: 14,
     marginBottom: 8,
   },
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   closeButton: {
-    backgroundColor: '#00ffcc',
+    backgroundColor: '#4fc3f7',
     paddingVertical: 14,
     borderRadius: 25,
     alignItems: 'center',

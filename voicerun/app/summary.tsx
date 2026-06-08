@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   button:{
     bottom: 16,
     alignSelf: 'center',
-    backgroundColor: '#565690',
+    backgroundColor: '#4fc3f7',
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: 25,
