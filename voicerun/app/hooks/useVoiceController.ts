@@ -15,6 +15,7 @@ interface VoiceControllerProps {
   calories: number;
   finalPace: string;
   totalSeconds: number;
+  isPermissionGranted: boolean | null;
 }
 
 const INTENTS = {
@@ -41,6 +42,7 @@ export function useVoiceController({
   calories,
   finalPace,
   totalSeconds,
+  isPermissionGranted,
 }: VoiceControllerProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -49,7 +51,7 @@ export function useVoiceController({
   
   const [isUserDisabled, setIsUserDisabled] = useState(false); 
   const isUserDisabledRef = useRef(false); // 👈 NUOVO REF: Risolve il bug dell'animazione verde che non partiva subito
-  
+  const isPermissionGrantedRef = useRef(isPermissionGranted);
   const shouldListenRef = useRef(false);
   const lastProcessedTextRef = useRef('');
   
@@ -177,6 +179,12 @@ export function useVoiceController({
 
     switch (intent) {
       case 'START':
+        if (isPermissionGrantedRef.current !== true) {
+          Vibration.vibrate([0, 200, 100, 200]);
+          speakSafe('Location permission is required to start the run.');
+          break;
+        }
+
         if (!isRunningRef.current) {
           setIsRunning(true);
           Vibration.vibrate(1000);

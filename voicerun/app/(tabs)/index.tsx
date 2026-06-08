@@ -4,12 +4,12 @@ import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
-
 import ActivityMap from "../components/ActivityMap";
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
 import Pace from "../components/Pace";
 import Timer from "../components/Timer";
+import VoiceInfoModal from "../components/VoiceInfoModal";
 import VoiceMicButton from "../components/VoiceMicButton";
 import { useTracking } from "../hooks/useTracking";
 import { useVoiceController } from "../hooks/useVoiceController";
@@ -28,7 +28,7 @@ export default function ActivityScreen() {
   const [resetKey, setResetKey] = useState(0);
   const [currentSeconds, setCurrentSeconds] = useState(0); 
   const totalSecondsRef = useRef(0);
-  
+  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
   const calories = (0.9 * 80 * distanceKm);
   const paceSecs = distanceKm > 0 ? Math.floor(totalSecondsRef.current / distanceKm) : 0;
   const { m, s } = formatTimer(paceSecs);
@@ -99,11 +99,15 @@ export default function ActivityScreen() {
     calories,
     finalPace,
     totalSeconds: currentSeconds,
+    isPermissionGranted,
   });
 
   return (
     <View style={globalStyles.container}>
       <StatusBar style="light" />
+      <TouchableOpacity style={styles.infoIconCircle} onPress={() => setIsInfoModalVisible(true)}>
+        <Ionicons name="information-circle-outline" size={28} color="white" />
+      </TouchableOpacity>
       <Image source={require('../../assets/images/logo-app.png')} style={globalStyles.logo} />
       
       <Timer 
@@ -190,6 +194,10 @@ export default function ActivityScreen() {
           )
         )}
       </View>
+      <VoiceInfoModal 
+        isVisible={isInfoModalVisible} 
+        onClose={() => setIsInfoModalVisible(false)} 
+      />
     </View>
   );
 }
@@ -198,6 +206,13 @@ const styles = StyleSheet.create({
   runDetails: { flexDirection: 'row', alignItems: 'center', gap: 20, paddingBottom: 12 },
   mapContainer: { width: '100%', flex: 1, position: 'relative' },
   map: { width: '100%', flex: 1 },
+  infoIconCircle: {
+    position: 'absolute',
+    top: 52, 
+    left: 20,
+    zIndex: 99,
+    padding: 6,
+  },
   startButton: {  
     position: 'absolute',
     bottom: 16,
