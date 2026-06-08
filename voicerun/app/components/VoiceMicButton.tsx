@@ -7,15 +7,21 @@ interface VoiceMicButtonProps {
   isListening: boolean;
   volume: number; 
   onPress?: () => void;
+  hasPermission?: boolean; // <-- NUOVA PROP: Traccia lo stato dei permessi del microfono
 }
 
-export default function VoiceMicButton({ isListening, volume, onPress }: VoiceMicButtonProps) {
+export default function VoiceMicButton({ 
+  isListening, 
+  volume, 
+  onPress, 
+  hasPermission = true // Di default è true per evitare errori se non passata immediatamente
+}: VoiceMicButtonProps) {
   const animatedVolume = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // 1. Animazione a ciclo continuo ad onda (verde di default)
+  // 1. Animazione a ciclo continuo ad onda (attiva solo se autorizzato)
   useEffect(() => {
-    if (isListening) {
+    if (isListening && hasPermission) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -33,16 +39,16 @@ export default function VoiceMicButton({ isListening, volume, onPress }: VoiceMi
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isListening]);
+  }, [isListening, hasPermission]);
 
-  // 2. Sincronizzazione dinamica reattiva per i decibel audio della voce
+  // 2. Sincronizzazione dinamica reattiva per i decibel audio della voce (attiva solo se autorizzato)
   useEffect(() => {
     Animated.timing(animatedVolume, {
-      toValue: isListening ? volume : 0,
+      toValue: (isListening && hasPermission) ? volume : 0,
       duration: 70, 
       useNativeDriver: true,
     }).start();
-  }, [volume, isListening]);
+  }, [volume, isListening, hasPermission]);
 
   const voiceScale = animatedVolume.interpolate({
     inputRange: [0, 1, 4, 10],
@@ -61,11 +67,19 @@ export default function VoiceMicButton({ isListening, volume, onPress }: VoiceMi
     outputRange: [0.4, 0.2, 0],
   });
 
+  // Determina dinamicamente il nome dell'icona
+  const getIconName = () => {
+    if (!hasPermission) {
+      return 'mic-off'; // Icona del microfono sbarrato se i permessi sono negati
+    }
+    return volume > 0.5 ? 'mic' : 'mic-outline';
+  };
+
   return (
     <View style={styles.container}>
       
-      {/* ONDA 1: Pulsazione continua di base (Sempre Verde) */}
-      {isListening && (
+      {/* ONDA 1: Pulsazione continua di base (Solo se autorizzato) */}
+      {isListening && hasPermission && (
         <Animated.View
           style={[
             styles.waveRing,
@@ -78,8 +92,8 @@ export default function VoiceMicButton({ isListening, volume, onPress }: VoiceMi
         />
       )}
 
-      {/* ONDA 2: Reattività volumetrica d'ampiezza voce (Sempre Verde brillante) */}
-      {isListening && (
+      {/* ONDA 2: Reattività volumetrica d'ampiezza voce (Solo se autorizzato) */}
+      {isListening && hasPermission && (
         <Animated.View
           style={[
             styles.waveRing,
@@ -95,15 +109,17 @@ export default function VoiceMicButton({ isListening, volume, onPress }: VoiceMi
       )}
 
       <TouchableOpacity 
-        style={styles.button} 
-        onPress={onPress}
-        activeOpacity={0.85}
+        style={[
+          styles.button, 
+          !hasPermission && styles.buttonDisabled 
+        ]} 
+        onPress={onPress} // 👈 Sempre attivo, gestirà il controllo internamente
+        activeOpacity={0.85} // 👈 Sempre attivo per dare un feedback visivo al tocco
       >
         <Ionicons 
-          // Se rileva un minimo di voce l'icona si riempie, altrimenti resta vuota
-          name={volume > 0.5 ? 'mic' : 'mic-outline'} 
+          name={getIconName()} 
           size={26} 
-          color='white' 
+          color={hasPermission ? 'white' : '#ef4444'} 
         />
       </TouchableOpacity>
     </View>
@@ -142,4 +158,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
+  buttonDisabled: {
+    borderColor: '#ef4444', // Aggiunge un bordo rosso per accentuare il blocco del microfono
+    borderWidth: 1.5,
+    backgroundColor: '#111122',
+  }
 });

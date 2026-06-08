@@ -1,6 +1,7 @@
 // hooks/useTracking.ts
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 
 export interface Coordinate {
   latitude: number;
@@ -24,20 +25,103 @@ export function useTracking(isRunning: boolean) {
   const [position, setPosition] = useState<Coordinate | null>(null);
   const [route, setRoute] = useState<Coordinate[]>([]);
   const [distanceKm, setDistanceKm] = useState(0);
+  
+  const [isPermissionGranted, setIsPermissionGranted] = useState<boolean | null>(null);
+  // Usiamo una ref per tracciare il permesso in modo sincrono e impedire ricaricamenti superflui
+  const isPermGrantedRef = useRef<boolean | null>(null); 
+  
   const watchRef = useRef<Location.LocationSubscription | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+  // Funzione di utilità per aggiornare stato e ref simultaneamente
+  const updatePermissionState = (granted: boolean) => {
+    isPermGrantedRef.current = granted;
+    setIsPermissionGranted(granted);
+  };
 
-      // Posizione iniziale anche prima di avviare
-      const current = await Location.getCurrentPositionAsync({});
-      setPosition({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-      });
-    })();
+  useEffect(() => {
+    let isMounted = true;
+
+    // Recupera la posizione in modo silenzioso per ripristinare la mappa
+    async function updateLocationSilent() {
+      try {
+        const current = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (isMounted) {
+          setPosition({
+            latitude: current.coords.latitude,
+            longitude: current.coords.longitude,
+          });
+        }
+      } catch (e) {
+        // Ignoriamo gli errori qui per evitare log fastidiosi
+      }
+    }
+
+    // Controlla lo stato generale di permessi e hardware
+    async function checkStatus(shouldRequest = false) {
+      try {
+        // 1. Controllo hardware (es. menu a tendina)
+        const servicesEnabled = await Location.hasServicesEnabledAsync();
+        if (!servicesEnabled) {
+          if (isMounted && isPermGrantedRef.current !== false) {
+            updatePermissionState(false);
+          }
+          return;
+        }
+
+        // 2. Controllo permessi app
+        const currentPerm = await Location.getForegroundPermissionsAsync();
+        
+        if (currentPerm.status === 'granted') {
+          // Se prima eravamo bloccati (es. GPS appena riacceso), sblocca e chiedi subito la posizione
+          if (isPermGrantedRef.current === false || isPermGrantedRef.current === null) {
+            if (isMounted) updatePermissionState(true);
+            await updateLocationSilent();
+          }
+        } else if (currentPerm.status === 'undetermined' && shouldRequest) {
+          const requestPerm = await Location.requestForegroundPermissionsAsync();
+          if (requestPerm.status === 'granted') {
+            if (isMounted) updatePermissionState(true);
+            await updateLocationSilent();
+          } else {
+            if (isMounted) updatePermissionState(false);
+          }
+        } else {
+          if (isMounted && isPermGrantedRef.current !== false) {
+            updatePermissionState(false);
+          }
+        }
+      } catch (err) {
+        if (isMounted && isPermGrantedRef.current !== false) {
+          updatePermissionState(false);
+        }
+      }
+    }
+
+    // Avvio immediato al caricamento
+    checkStatus(true);
+
+    // Ascoltatore cambi di stato (quando l'utente esce completamente per andare in Impostazioni)
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        checkStatus(false);
+      }
+    });
+
+    // POLLING: Controllo continuo (ogni 2 secondi) per le disattivazioni al volo (menu a tendina)
+    const intervalId = setInterval(() => {
+      // Evitiamo controlli se l'app è in background per risparmiare risorse
+      if (AppState.currentState === 'active') {
+        checkStatus(false);
+      }
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+      clearInterval(intervalId); // Pulizia del timer
+    };
   }, []);
 
   useEffect(() => {
@@ -50,43 +134,47 @@ export function useTracking(isRunning: boolean) {
   }, [isRunning]);
 
   const startWatching = async () => {
-    watchRef.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 5, // 👈 aggiorna ogni 5 metri
-      },
-      (loc) => {
-        const newCoord: Coordinate = {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        };
+    if (watchRef.current) return; 
 
-        setPosition(newCoord);
+    try {
+      watchRef.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          distanceInterval: 5,
+        },
+        (loc) => {
+          const newCoord: Coordinate = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          };
 
-        setRoute((prev) => {
-          if (prev.length > 0) {
-            const added = haversine(prev[prev.length - 1], newCoord);
-            if (added > 0.005) { //ignore updates smaller than 5 meters
-              setDistanceKm((d) => d + added);
-              return [...prev, newCoord];
-            }
-            return prev;
-          } 
-          return [...prev, newCoord];
-        });
-      }
-    );
+          setPosition(newCoord);
+
+          setRoute((prev) => {
+            if (prev.length > 0) {
+              const added = haversine(prev[prev.length - 1], newCoord);
+              if (added > 0.005) { 
+                setDistanceKm((d) => d + added);
+                return [...prev, newCoord];
+              }
+              return prev;
+            } 
+            return [...prev, newCoord];
+          });
+        }
+      );
+    } catch (err) {
+      console.log("Errore durante l'avvio di watchPositionAsync:", err);
+      updatePermissionState(false);
+    }
   };
 
   const stopWatching = () => {
-    watchRef.current?.remove();
-    watchRef.current = null;
+    if (watchRef.current) {
+      watchRef.current.remove();
+      watchRef.current = null;
+    }
   };
 
-  const reset = () => {
-    setRoute([]);
-    setDistanceKm(0);
-  };
-
-  return { position, route, distanceKm, reset };
+  return { position, route, distanceKm, isPermissionGranted };
 }

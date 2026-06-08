@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Vibration } from 'react-native';
+import { Alert, Linking, Vibration } from 'react-native';
 import { formatTimer } from '../utils/formatTimer';
 
 interface VoiceControllerProps {
@@ -15,7 +15,6 @@ interface VoiceControllerProps {
   calories: number;
   finalPace: string;
   totalSeconds: number;
-  
 }
 
 const INTENTS = {
@@ -46,6 +45,10 @@ export function useVoiceController({
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [volume, setVolume] = useState(0); 
+  const [hasPermission, setHasPermission] = useState<boolean | undefined>(undefined); 
+  
+  const [isUserDisabled, setIsUserDisabled] = useState(false); 
+  const isUserDisabledRef = useRef(false); // 👈 NUOVO REF: Risolve il bug dell'animazione verde che non partiva subito
   
   const shouldListenRef = useRef(false);
   const lastProcessedTextRef = useRef('');
@@ -139,14 +142,11 @@ export function useVoiceController({
   useSpeechRecognitionEvent('result', (event) => {
     if (!shouldListenRef.current || isSpeakingRef.current) return;
 
-    // Normalizziamo il testo per sicurezza
     let text = event.results[event.results.length - 1]?.transcript?.toLowerCase().trim() || '';
     setTranscript(text);
 
     if (!text || text === lastProcessedTextRef.current) return;
 
-    // SOTTO-STATO: Risposta diretta per la conferma di interruzione corsa 
-    // (Qui NON serve dire "Voicerun", l'utente può rispondere in modo naturale)
     if (isConfirmingStopRef.current) {
       if (CONFIRM_YES.test(text)) {
         lastProcessedTextRef.current = text;
@@ -161,25 +161,18 @@ export function useVoiceController({
       return; 
     }
 
-    // 🔴 FILTRO PRINCIPALE: LA FRASE DEVE INIZIARE CON "VOICERUN"
-    // Spesso i motori di riconoscimento scrivono "voice run" separato. Normalizziamolo.
     if (text.startsWith('voice run')) {
       text = text.replace('voice run', 'voicerun');
     }
 
-    // Se non inizia per voicerun, ignoriamo tutto (es. tosse, parlate con amici, ecc)
     if (!text.startsWith('voicerun')) {
       return; 
     }
 
-    // Puliamo la stringa tenendo solo il comando utile (es. "Voicerun how far" -> "how far")
     const commandText = text.replace('voicerun', '').trim();
-
-    // Troviamo l'intento dentro al resto della frase
     const intent = getParsedIntent(commandText);
     if (!intent) return; 
 
-    // Salviamo il testo completo come ultimo processato per evitare duplicati
     lastProcessedTextRef.current = text;
 
     switch (intent) {
@@ -248,28 +241,56 @@ export function useVoiceController({
     }
   });
 
-  const startListening = async () => {
-    if (!shouldListenRef.current || isStartingRef.current || isSpeakingRef.current || isListeningRef.current) return;
-    isStartingRef.current = true; 
+  const startListening = async (isManual = false) => {
+    if (isManual) {
+      shouldListenRef.current = true;
+      setIsUserDisabled(false); 
+      isUserDisabledRef.current = false; // 👈 Sblocca immediatamente il riferimento sincrono
+    }
+
+    // 👈 MODIFICATO: Controlla il ref invece dello stato per evitare il lag di React
+    if (!shouldListenRef.current || isUserDisabledRef.current || isSpeakingRef.current) return;
 
     try {
       const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (granted && shouldListenRef.current && !isSpeakingRef.current) {
-        ExpoSpeechRecognitionModule.start({
-          lang: 'en-US',
-          continuous: true,
-          interimResults: true,
-          androidIntentOptions: {
-            EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 10000,
-            EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 4000,
-            EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2000,
-          },
-        });
-      } else {
+      setHasPermission(granted); 
+
+      if (!granted) {
         isStartingRef.current = false;
+        
+        if (isManual) {
+          Alert.alert(
+            'Microphone Permission',
+            'Voice commands require microphone access. Please enable it in your system settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Settings', onPress: () => Linking.openSettings() }, 
+            ]
+          );
+        }
+        return;
       }
+
+      if (isStartingRef.current || isListeningRef.current) {
+        isStartingRef.current = false;
+        return;
+      }
+
+      isStartingRef.current = true; 
+
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        continuous: true,
+        interimResults: true,
+        androidIntentOptions: {
+          EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 10000,
+          EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 4000,
+          EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2000,
+        },
+      });
     } catch (e) {
       console.log("Error starting speech recognition", e);
+      setHasPermission(false); 
       isStartingRef.current = false;
     }
   };
@@ -281,7 +302,7 @@ export function useVoiceController({
       isConfirmingStopRef.current = false;
       lastProcessedTextRef.current = '';
 
-      startListening();
+      startListening(false); 
 
       return () => {
         shouldListenRef.current = false;
@@ -295,10 +316,13 @@ export function useVoiceController({
     isAwake: isConfirmingStopRef.current, 
     volume, 
     transcript,
+    hasPermission: hasPermission === false ? false : !isUserDisabled, 
     speakSafe, 
-    startListening, 
+    startListening: () => startListening(true), 
     stopListening: () => {
       shouldListenRef.current = false;
+      setIsUserDisabled(true); 
+      isUserDisabledRef.current = true; // 👈 Blocca immediatamente il riferimento sincrono
       ExpoSpeechRecognitionModule.stop();
     }
   };

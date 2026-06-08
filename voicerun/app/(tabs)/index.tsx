@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
+import { Alert, Image, Linking, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
+
 import ActivityMap from "../components/ActivityMap";
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
@@ -13,7 +14,7 @@ import VoiceMicButton from "../components/VoiceMicButton";
 import { useTracking } from "../hooks/useTracking";
 import { useVoiceController } from "../hooks/useVoiceController";
 import { addRun } from '../storage/activities';
-import { globalStyles } from "../styles/global";
+import { colors, globalStyles } from "../styles/global";
 import { formatTimer } from '../utils/formatTimer';
 
 export default function ActivityScreen() {
@@ -21,14 +22,18 @@ export default function ActivityScreen() {
   
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const { position, route, distanceKm } = useTracking(isRunning && !isPaused); 
+  
+  const { position, route, distanceKm, isPermissionGranted } = useTracking(isRunning && !isPaused); 
+  
   const [resetKey, setResetKey] = useState(0);
   const [currentSeconds, setCurrentSeconds] = useState(0); 
   const totalSecondsRef = useRef(0);
+  
   const calories = (0.9 * 80 * distanceKm);
   const paceSecs = distanceKm > 0 ? Math.floor(totalSecondsRef.current / distanceKm) : 0;
   const { m, s } = formatTimer(paceSecs);
   const finalPace = m + ":" + s;
+  
   const announcedKmRef = useRef(0);
 
   useEffect(() => {
@@ -76,7 +81,15 @@ export default function ActivityScreen() {
     );
   };
 
-  const { isAwake, isListening, volume, startListening } = useVoiceController({
+  // 👈 ESTRAIAMO ANCHE stopListening 
+  const { 
+    isAwake, 
+    isListening, 
+    volume, 
+    startListening, 
+    stopListening, 
+    hasPermission: isMicPermissionGranted 
+  } = useVoiceController({
     isRunning,
     isPaused,
     setIsRunning,
@@ -109,21 +122,52 @@ export default function ActivityScreen() {
       </View>
       
       <View style={styles.mapContainer}>
-        <ActivityMap position={position} route={route} distanceKm={distanceKm} />
+        {isPermissionGranted === false ? (
+          <View style={styles.permissionContainer}>
+            <Ionicons name="location-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 16 }} />
+            <Text style={styles.permissionText}>
+              The app needs location permissions to display the map and track your ride.
+            </Text>
+            <TouchableOpacity style={styles.settingsButton} onPress={() => Linking.openSettings()}>
+              <Text style={styles.settingsButtonText}>Open Settings</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ActivityMap position={position} route={route} distanceKm={distanceKm} />
+        )}
         
         <VoiceMicButton 
           isAwake={isAwake} 
           isListening={isListening} 
           volume={volume} 
+          hasPermission={isMicPermissionGranted} 
           onPress={() => {
-            startListening();
+            if (isListening) {
+              // 👈 AGGIUNTO: Chiede la conferma prima di disattivare
+              Alert.alert(
+                'Disable voice commands',
+                'Are you sure you want to mute your microphone?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Deactivate', 
+                    style: 'destructive', 
+                    onPress: () => stopListening() // Disattiva solo se l'utente preme "Disattiva"
+                  }
+                ]
+              );
+            } else {
+              // Se è già spento, si riattiva immediatamente al primo click
+              startListening();
+            }
           }}
         />
-
         {!isRunning ? (
-          <TouchableOpacity style={styles.startButton} onPress={() => { setIsRunning(true); Speech.speak('Run started', { language: 'en-US' }); Vibration.vibrate(1000); }}>
-            <Text style={styles.startButtonText}>Start Run</Text>
-          </TouchableOpacity>
+          isPermissionGranted === true && (
+            <TouchableOpacity style={styles.startButton} onPress={() => { setIsRunning(true); Speech.speak('Run started', { language: 'en-US' }); Vibration.vibrate(1000); }}>
+              <Text style={styles.startButtonText}>Start Run</Text>
+            </TouchableOpacity>
+          )
         ) : ( 
           !isPaused ? (
             <View style={styles.runButtons}>
@@ -188,4 +232,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stopButton: { backgroundColor: '#1a1a2e' },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: colors.background,
+  },
+  permissionText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  settingsButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 25,
+  },
+  settingsButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
