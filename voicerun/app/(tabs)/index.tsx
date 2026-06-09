@@ -76,7 +76,7 @@ export default function ActivityScreen() {
       'Are you sure you want to finish the activity?',
       [
         { text: 'No', style: 'cancel' },
-        { text: 'Yes', onPress: () => confirmStopActivity() } 
+        { text: 'Yes', onPress: () => {{confirmStopActivity(); Vibration.vibrate(1000);}} } 
       ]
     );
   };
@@ -137,7 +137,7 @@ export default function ActivityScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <ActivityMap position={position} route={route} distanceKm={distanceKm} />
+          <ActivityMap position={position} route={route}/>
         )}
         
         <VoiceMicButton 
@@ -168,11 +168,24 @@ export default function ActivityScreen() {
         />
         {!isRunning ? (
           isPermissionGranted === true && (
-            <TouchableOpacity style={styles.startButton} onPress={() => { setIsRunning(true); Speech.speak('Run started', { language: 'en-US' }); Vibration.vibrate(1000); }}>
-              <Text style={styles.startButtonText}>Start Run</Text>
+            <TouchableOpacity 
+              // 1. Aggiungiamo un'opacità ridotta se position è null
+              style={[styles.startButton, !position && { opacity: 0.5 }]} 
+              // 2. Disabilitiamo il tocco se position è null
+              disabled={!position} 
+              onPress={() => { 
+                setIsRunning(true); 
+                Speech.speak('Run started', { language: 'en-US' }); 
+                Vibration.vibrate(1000); 
+              }}
+            >
+              {/* 3. Opzionale ma consigliato: cambiamo il testo per dare feedback */}
+              <Text style={styles.startButtonText}>
+                {!position ? 'Acquiring GPS...' : 'Start Run'}
+              </Text>
             </TouchableOpacity>
           )
-        ) : ( 
+        ) : (
           !isPaused ? (
             <View style={styles.runButtons}>
               <TouchableOpacity style={styles.circleButtonRestart} onPress={() => {setIsPaused(!isPaused); Vibration.vibrate(100)}}>

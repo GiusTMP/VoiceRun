@@ -73,6 +73,7 @@ export function useVoiceController({
   useEffect(() => { caloriesRef.current = calories; }, [calories]);
   useEffect(() => { finalPaceRef.current = finalPace; }, [finalPace]);
   useEffect(() => { totalSecondsRef.current = totalSeconds; }, [totalSeconds]);
+  useEffect(() => { isPermissionGrantedRef.current = isPermissionGranted; }, [isPermissionGranted]);
 
   const getParsedIntent = (text: string): keyof typeof INTENTS | null => {
     for (const [intent, regex] of Object.entries(INTENTS)) {
@@ -153,6 +154,7 @@ export function useVoiceController({
       if (CONFIRM_YES.test(text)) {
         lastProcessedTextRef.current = text;
         isConfirmingStopRef.current = false;
+        Vibration.vibrate(1000);
         speakSafe('Activity terminated');
         confirmStop(); 
       } else if (CONFIRM_NO.test(text)) {

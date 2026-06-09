@@ -32,7 +32,7 @@ export default function SummaryScreen() {
       {/* Torna alla home */}
       <View style={{ height: 1, backgroundColor: 'white', marginVertical: 10, width: '70%', marginBottom: 50 }} />
 
-      <TouchableOpacity style={styles.button} onPress={() => {router.replace('/history')}}>
+      <TouchableOpacity style={styles.button} onPress={() => router.replace('/history')}>
         <Text style={{color:'white', fontWeight: 'bold'}}>Done</Text>
       </TouchableOpacity>
     </View>

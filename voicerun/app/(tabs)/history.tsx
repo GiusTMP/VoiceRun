@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
 import RunItem from '../components/RunItem';
 import { clearAllRuns, getRun, Run } from '../storage/activities';
 import { colors, globalStyles } from '../styles/global';
@@ -33,7 +33,7 @@ export default function AllRunsScreen() {
           {
             text: 'Yes',
             onPress: () => {
-              clearAllAndLoad();
+              {{clearAllAndLoad();Vibration.vibrate(500)}}
             }
           }
         ]
@@ -74,7 +74,7 @@ export default function AllRunsScreen() {
               calories={run.calories}
               pace={run.pace}
               date={run.createdAt}
-              onPress={() => router.push({
+              onPress={() => {{router.push({
               pathname: '/summary',
               params: {
                 distanceKm: parseFloat(run.distance).toFixed(2),
@@ -82,7 +82,7 @@ export default function AllRunsScreen() {
                 calories: parseFloat(run.calories).toFixed(0),
                 pace: run.pace,
               },
-            })}
+            }); Vibration.vibrate(100);}}}
             />
           ))
         )}
