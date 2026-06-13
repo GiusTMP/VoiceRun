@@ -18,19 +18,69 @@ interface VoiceControllerProps {
   isPermissionGranted: boolean | null;
 }
 
-const INTENTS = {
-  START: /start|begin|let's go|go for a run/i,
-  PAUSE: /pause|hold on|take a break|suspend/i,
-  RESUME: /resume|continue|go on|keep going/i,
-  STOP: /stop|finish|end run|call it a day|terminate/i,
-  DISTANCE: /distance|how far|kilometers|km|meters/i,
-  TIME: /time|duration|how long|timer|clock/i,
-  CALORIES: /calories|burned|fat|kcal|energy/i,
-  PACE: /pace|rhythm|speed|how fast/i,
-};
+type AppIntent = 'START' | 'PAUSE' | 'RESUME' | 'STOP' | 'DISTANCE' | 'TIME' | 'CALORIES' | 'PACE' | 'UNKNOWN';
 
+// Espressioni regolari locali per il controllo e la pulizia sul dispositivo
+const WAKE_WORD_CHECK_REGEX = /(voicerun|voice\s*run|voice\s*runner|boys?\s*run|voice\s*ram)/i;
+const WAKE_WORD_REPLACE_REGEX = /(voicerun|voice\s*run|voice\s*runner|boys?\s*run|voice\s*ram)/gi;
 const CONFIRM_YES = /yes|yeah|sure|confirm|do it|ok/i;
 const CONFIRM_NO = /no|cancel|dont|don't|keep running/i;
+
+// --- FUNZIONE GROQ AI ULTRA-OTTIMIZZATA (MINIMO CONSUMO TOKEN) ---
+async function analyzeIntentWithAI(cleanedCommand: string): Promise<AppIntent> {
+  // ⚠️ INSERISCI QUI LA TUA API KEY DI GROQ (console.groq.com)
+  const API_KEY = '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'; 
+  const MODEL = 'llama-3.1-8b-instant'; 
+  
+  try {
+    const response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.1,
+        max_tokens: 15, // Blocco output per risparmiare token
+        response_format: { type: "json_object" }, 
+        messages: [
+          {
+            role: "system",
+            // Prompt ridotto all'60% per risparmiare sui token di sistema a ogni chiamata
+            content: `In JSON return ONLY {"intent": "VAL"}.
+              Allowed VAL: START, PAUSE, RESUME, STOP, DISTANCE, TIME, CALORIES, PACE, UNKNOWN.
+              Acoustic fixes:
+              - "base","bass","space","face","paste" -> PACE
+              - "distant","stance" -> DISTANCE
+              - "tie" -> TIME
+              Examples: "how far"->DISTANCE, "how long"->TIME, "burned"->CALORIES.`
+          },
+          {
+            role: "user",
+            content: cleanedCommand // Mandiamo solo il comando puro, senza wake word
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      console.error("🔴 Errore nativo dall'API Groq:", data.error.message);
+      return 'UNKNOWN';
+    }
+
+    const jsonText = data.choices[0].message.content;
+    const parsed = JSON.parse(jsonText);
+    const intentValue = parsed.intent ? String(parsed.intent).trim().toUpperCase() : 'UNKNOWN';
+    
+    console.log(`🤖 [Groq AI] Risposta: -> Intento elaborato: "${intentValue}"`);
+    return (intentValue as AppIntent) || 'UNKNOWN';
+  } catch (error) {
+    console.error("Errore generico Groq AI:", error);
+    return 'UNKNOWN';
+  }
+}
 
 export function useVoiceController({
   isRunning,
@@ -50,7 +100,7 @@ export function useVoiceController({
   const [hasPermission, setHasPermission] = useState<boolean | undefined>(undefined); 
   
   const [isUserDisabled, setIsUserDisabled] = useState(false); 
-  const isUserDisabledRef = useRef(false); // 👈 NUOVO REF: Risolve il bug dell'animazione verde che non partiva subito
+  const isUserDisabledRef = useRef(false); 
   const isPermissionGrantedRef = useRef(isPermissionGranted);
   const shouldListenRef = useRef(false);
   const lastProcessedTextRef = useRef('');
@@ -59,6 +109,9 @@ export function useVoiceController({
   const isSpeakingRef = useRef(false); 
   const isListeningRef = useRef(false); 
   const isConfirmingStopRef = useRef(false);
+  const isAnalyzingRef = useRef(false);
+
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isRunningRef = useRef(isRunning);
   const isPausedRef = useRef(isPaused);
@@ -75,18 +128,10 @@ export function useVoiceController({
   useEffect(() => { totalSecondsRef.current = totalSeconds; }, [totalSeconds]);
   useEffect(() => { isPermissionGrantedRef.current = isPermissionGranted; }, [isPermissionGranted]);
 
-  const getParsedIntent = (text: string): keyof typeof INTENTS | null => {
-    for (const [intent, regex] of Object.entries(INTENTS)) {
-      if (regex.test(text)) return intent as keyof typeof INTENTS;
-    }
-    return null;
-  };
-
   const speakSafe = (text: string) => {
     if (isSpeakingRef.current) return;
     isSpeakingRef.current = true;
     setVolume(0); 
-    
     ExpoSpeechRecognitionModule.stop();
 
     setTimeout(() => {
@@ -114,7 +159,7 @@ export function useVoiceController({
     setIsListening(false);
     isListeningRef.current = false;
     setVolume(0); 
-    if (shouldListenRef.current && !isSpeakingRef.current && !isStartingRef.current) {
+    if (shouldListenRef.current && !isSpeakingRef.current && !isStartingRef.current && !isAnalyzingRef.current) {
       setTimeout(() => startListening(), 150); 
     }
   });
@@ -124,17 +169,15 @@ export function useVoiceController({
     isListeningRef.current = false;
     isStartingRef.current = false;
     setVolume(0); 
-
     const ignoredErrors = ['other', 'no-speech', 'aborted'];
     const delay = ignoredErrors.includes(event.error) ? 300 : 1500;
-    
-    if (shouldListenRef.current && !isSpeakingRef.current) {
+    if (shouldListenRef.current && !isSpeakingRef.current && !isAnalyzingRef.current) {
       setTimeout(() => startListening(), delay); 
     }
   });
 
   useSpeechRecognitionEvent('volumechange', (event) => {
-    if (isSpeakingRef.current) {
+    if (isSpeakingRef.current || isAnalyzingRef.current) {
       setVolume(0);
       return;
     }
@@ -143,123 +186,152 @@ export function useVoiceController({
   });
   
   useSpeechRecognitionEvent('result', (event) => {
-    if (!shouldListenRef.current || isSpeakingRef.current) return;
+    if (!shouldListenRef.current || isSpeakingRef.current || isAnalyzingRef.current) return;
 
-    let text = event.results[event.results.length - 1]?.transcript?.toLowerCase().trim() || '';
+    // Risoluzione bug frasi duplicate: prendiamo solo il primo risultato (quello definitivo)
+    const text = event.results[0]?.transcript?.toLowerCase().trim() || '';
     setTranscript(text);
 
     if (!text || text === lastProcessedTextRef.current) return;
 
-    if (isConfirmingStopRef.current) {
-      if (CONFIRM_YES.test(text)) {
-        lastProcessedTextRef.current = text;
-        isConfirmingStopRef.current = false;
-        Vibration.vibrate(1000);
-        speakSafe('Activity terminated');
-        confirmStop(); 
-      } else if (CONFIRM_NO.test(text)) {
-        lastProcessedTextRef.current = text;
-        isConfirmingStopRef.current = false;
-        speakSafe('Tracking continued');
-      }
+    // Controllo locale della wake word tramite Regex senza spreco di token
+    const hasWakeWord = WAKE_WORD_CHECK_REGEX.test(text);
+
+    if (!hasWakeWord && !isConfirmingStopRef.current) {
       return; 
     }
 
-    if (text.startsWith('voice run')) {
-      text = text.replace('voice run', 'voicerun');
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
 
-    if (!text.startsWith('voicerun')) {
-      return; 
-    }
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (!shouldListenRef.current || isSpeakingRef.current || isAnalyzingRef.current) return;
 
-    const commandText = text.replace('voicerun', '').trim();
-    const intent = getParsedIntent(commandText);
-    if (!intent) return; 
-
-    lastProcessedTextRef.current = text;
-
-    switch (intent) {
-      case 'START':
-        if (isPermissionGrantedRef.current !== true) {
-          Vibration.vibrate([0, 200, 100, 200]);
-          speakSafe('Location permission is required to start the run.');
-          break;
-        }
-
-        if (!isRunningRef.current) {
-          setIsRunning(true);
+      // Gestione della conferma di stop (Senza passare dall'AI)
+      if (isConfirmingStopRef.current) {
+        if (CONFIRM_YES.test(text)) {
+          lastProcessedTextRef.current = text;
+          isConfirmingStopRef.current = false;
           Vibration.vibrate(1000);
-          speakSafe('Run started');
-        } else {
-          speakSafe('The run is already active');
+          speakSafe('Activity terminated');
+          confirmStop(); 
+        } else if (CONFIRM_NO.test(text)) {
+          lastProcessedTextRef.current = text;
+          isConfirmingStopRef.current = false;
+          speakSafe('Tracking continued');
         }
-        break;
+        return; 
+      }
 
-      case 'PAUSE':
-        if (isRunningRef.current && !isPausedRef.current) {
-          setIsPaused(true);
-          Vibration.vibrate(100);
-          speakSafe('Run paused');
-        } else {
-          speakSafe('The tracking cannot be paused right now');
+      // Rimuoviamo localmente la wake word dal testo prima dell'invio all'AI
+      const commandText = text.replace(WAKE_WORD_REPLACE_REGEX, '').trim();
+      
+      // Se l'utente ha detto solo la wake word senza comandi, ci fermiamo qui risparmiando la chiamata API
+      if (commandText.length < 2) return; 
+
+      isAnalyzingRef.current = true;
+      lastProcessedTextRef.current = text;
+      ExpoSpeechRecognitionModule.stop();
+
+      try {
+        console.log(`✉️ Inviando a Groq solo il comando pulito: "${commandText}"`);
+        const intent = await analyzeIntentWithAI(commandText);
+
+        switch (intent) {
+          case 'START':
+            if (isPermissionGrantedRef.current !== true) {
+              Vibration.vibrate([0, 200, 100, 200]);
+              speakSafe('Location permission is required to start the run.');
+              break;
+            }
+            if (!isRunningRef.current) {
+              setIsRunning(true);
+              Vibration.vibrate(1000);
+              speakSafe('Run started');
+            } else {
+              speakSafe('The run is already active');
+            }
+            break;
+
+          case 'PAUSE':
+            if (isRunningRef.current && !isPausedRef.current) {
+              setIsPaused(true);
+              Vibration.vibrate(100);
+              speakSafe('Run paused');
+            } else {
+              speakSafe('The tracking cannot be paused right now');
+            }
+            break;
+
+          case 'RESUME':
+            if (isRunningRef.current && isPausedRef.current) {
+              setIsPaused(false);
+              Vibration.vibrate(100);
+              speakSafe('Run resumed');
+            } else {
+              speakSafe('The tracking is already active');
+            }
+            break;
+
+          case 'STOP':
+            if (isRunningRef.current) {
+              isConfirmingStopRef.current = true; 
+              speakSafe('Are you sure you want to finish? Say yes to confirm, or no to cancel.');
+            } else {
+              speakSafe('No active activity to stop');
+            }
+            break;
+
+          case 'TIME':
+            const { h, m, s } = formatTimer(totalSecondsRef.current);
+            const speechTime = parseInt(h) > 0 
+              ? `${parseInt(h)} hours, ${parseInt(m)} minutes and ${parseInt(s)} seconds`
+              : `${parseInt(m)} minutes and ${parseInt(s)} seconds`;
+            speakSafe(`Time elapsed: ${speechTime}`);
+            break;
+
+          case 'DISTANCE':
+            speakSafe(`You have run ${distanceKmRef.current.toFixed(2)} kilometers`);
+            break;
+
+          case 'CALORIES':
+            speakSafe(`You have burn ${caloriesRef.current.toFixed(0)} calories`);
+            break;
+
+          case 'PACE':
+            const paceParts = finalPaceRef.current.split(':');
+            const paceSpeech = paceParts.length === 2 
+              ? `${parseInt(paceParts[0])} minutes and ${parseInt(paceParts[1])} seconds per kilometer`
+              : 'Pace not available';
+            speakSafe(`Your current pace is ${paceSpeech}`);
+            break;
+            
+          case 'UNKNOWN':
+          default:
+            speakSafe("I didn't quite catch that. Try again.");
+            break;
         }
-        break;
-
-      case 'RESUME':
-        if (isRunningRef.current && isPausedRef.current) {
-          setIsPaused(false);
-          Vibration.vibrate(100);
-          speakSafe('Run resumed');
-        } else {
-          speakSafe('The tracking is already active');
+      } catch (error) {
+        console.error("Errore nello smistamento dell'intento:", error);
+        speakSafe("Sorry, I had trouble understanding. Try again.");
+      } finally {
+        isAnalyzingRef.current = false;
+        if (shouldListenRef.current && !isSpeakingRef.current) {
+          startListening(false);
         }
-        break;
-
-      case 'STOP':
-        if (isRunningRef.current) {
-          isConfirmingStopRef.current = true; 
-          speakSafe('Are you sure you want to finish? Say yes to confirm, or no to cancel.');
-        } else {
-          speakSafe('No active activity to stop');
-        }
-        break;
-
-      case 'TIME':
-        const { h, m, s } = formatTimer(totalSecondsRef.current);
-        const speechTime = parseInt(h) > 0 
-          ? `${parseInt(h)} hours, ${parseInt(m)} minutes and ${parseInt(s)} seconds`
-          : `${parseInt(m)} minutes and ${parseInt(s)} seconds`;
-        speakSafe(`Time elapsed: ${speechTime}`);
-        break;
-
-      case 'DISTANCE':
-        speakSafe(`You have run ${distanceKmRef.current.toFixed(2)} kilometers`);
-        break;
-
-      case 'CALORIES':
-        speakSafe(`You have burn ${caloriesRef.current.toFixed(0)} calories`);
-        break;
-
-      case 'PACE':
-        const paceParts = finalPaceRef.current.split(':');
-        const paceSpeech = paceParts.length === 2 
-          ? `${parseInt(paceParts[0])} minutes and ${parseInt(paceParts[1])} seconds per kilometer`
-          : 'Pace not available';
-        speakSafe(`Your current pace is ${paceSpeech}`);
-        break;
-    }
+      }
+    }, 1200); 
   });
 
   const startListening = async (isManual = false) => {
     if (isManual) {
       shouldListenRef.current = true;
       setIsUserDisabled(false); 
-      isUserDisabledRef.current = false; // 👈 Sblocca immediatamente il riferimento sincrono
+      isUserDisabledRef.current = false; 
     }
 
-    // 👈 MODIFICATO: Controlla il ref invece dello stato per evitare il lag di React
-    if (!shouldListenRef.current || isUserDisabledRef.current || isSpeakingRef.current) return;
+    if (!shouldListenRef.current || isUserDisabledRef.current || isSpeakingRef.current || isAnalyzingRef.current) return;
 
     try {
       const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
@@ -267,7 +339,6 @@ export function useVoiceController({
 
       if (!granted) {
         isStartingRef.current = false;
-        
         if (isManual) {
           Alert.alert(
             'Microphone Permission',
@@ -310,12 +381,14 @@ export function useVoiceController({
       shouldListenRef.current = true;
       isStartingRef.current = false;
       isConfirmingStopRef.current = false;
+      isAnalyzingRef.current = false;
       lastProcessedTextRef.current = '';
 
       startListening(false); 
 
       return () => {
         shouldListenRef.current = false;
+        if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
         ExpoSpeechRecognitionModule.stop();
       };
     }, [])
@@ -323,7 +396,7 @@ export function useVoiceController({
 
   return {
     isListening,
-    isAwake: isConfirmingStopRef.current, 
+    isAwake: isConfirmingStopRef.current || isAnalyzingRef.current, 
     volume, 
     transcript,
     hasPermission: hasPermission === false ? false : !isUserDisabled, 
@@ -332,7 +405,8 @@ export function useVoiceController({
     stopListening: () => {
       shouldListenRef.current = false;
       setIsUserDisabled(true); 
-      isUserDisabledRef.current = true; // 👈 Blocca immediatamente il riferimento sincrono
+      isUserDisabledRef.current = true; 
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
       ExpoSpeechRecognitionModule.stop();
     }
   };
