@@ -29,7 +29,7 @@ const CONFIRM_NO = /no|cancel|dont|don't|keep running/i;
 // --- FUNZIONE GROQ AI ULTRA-OTTIMIZZATA (MINIMO CONSUMO TOKEN) ---
 async function analyzeIntentWithAI(cleanedCommand: string): Promise<AppIntent> {
   // ⚠️ INSERISCI QUI LA TUA API KEY DI GROQ (console.groq.com)
-  const API_KEY = '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'; 
+  const API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY; 
   const MODEL = 'llama-3.1-8b-instant'; 
   
   try {

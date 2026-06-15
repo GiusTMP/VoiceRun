@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
+import { Alert, AppState, Image, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
 import ActivityMap from "../components/ActivityMap";
 import Calories from "../components/Calories";
 import Distance from "../components/Distance";
@@ -25,6 +26,9 @@ export default function ActivityScreen() {
   
   const { position, route, distanceKm, isPermissionGranted } = useTracking(isRunning && !isPaused); 
   
+  // Stato per capire se il blocco è dovuto ai permessi app o solo al GPS spento
+  const [arePermissionsGranted, setArePermissionsGranted] = useState<boolean | null>(null);
+
   const [resetKey, setResetKey] = useState(0);
   const [currentSeconds, setCurrentSeconds] = useState(0); 
   const totalSecondsRef = useRef(0);
@@ -43,6 +47,38 @@ export default function ActivityScreen() {
       Speech.speak(`${km} kilometers. Pace: ${finalPace}`, { language: 'en-US' });
     }
   }, [distanceKm]);
+
+  // Controlla lo stato reale dei permessi e si aggiorna se l'utente riattiva l'app
+  useEffect(() => {
+    const checkPermissions = async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setArePermissionsGranted(status === 'granted');
+    };
+    
+    checkPermissions();
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkPermissions();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [isPermissionGranted]);
+
+  const handleRequestPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setArePermissionsGranted(status === 'granted');
+      if (status === 'granted') {
+        Alert.alert("Success", "Location permission granted!");
+      } else {
+        Alert.alert("Permission Denied", "To use the app, please allow location access.");
+      }
+    } catch (error) {
+      console.log("Error requesting location permission:", error);
+    }
+  };
 
   const handleAddRun = async () => {
     await addRun({
@@ -81,7 +117,6 @@ export default function ActivityScreen() {
     );
   };
 
-  // 👈 ESTRAIAMO ANCHE stopListening 
   const { 
     isAwake, 
     isListening, 
@@ -126,28 +161,40 @@ export default function ActivityScreen() {
       </View>
       
       <View style={styles.mapContainer}>
-        {isPermissionGranted === false ? (
-          <View style={styles.permissionContainer}>
-            <Ionicons name="location-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 16 }} />
-            <Text style={styles.permissionText}>
-              The app needs location permissions to display the map and track your ride.
-            </Text>
-            <TouchableOpacity style={styles.settingsButton} onPress={() => Linking.openSettings()}>
-              <Text style={styles.settingsButtonText}>Open Settings</Text>
-            </TouchableOpacity>
-          </View>
+        {isPermissionGranted === false && arePermissionsGranted !== null ? (
+          arePermissionsGranted ? (
+            // CASO A: I permessi dell'app sono già OK, ma il GPS del telefono è spento
+            <View style={styles.permissionContainer}>
+              <Ionicons name="location-outline" size={48} color="#ffb74d" style={{ marginBottom: 16 }} />
+              <Text style={styles.permissionText}>
+                Please turn on your device's location (GPS) to display the map and track your ride.
+              </Text>
+            </View>
+          ) : (
+            // CASO B: Mancano effettivamente le autorizzazioni dell'app
+            <View style={styles.permissionContainer}>
+              <Ionicons name="location-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 16 }} />
+              <Text style={styles.permissionText}>
+                The app needs location permissions to display the map and track your ride.
+              </Text>
+              
+              {/* Sotto c'è solo il pulsante per richiedere il permesso nativo */}
+              <TouchableOpacity style={styles.settingsButton} onPress={handleRequestPermission}>
+                <Text style={styles.settingsButtonText}>Grant Permission</Text>
+              </TouchableOpacity>
+            </View>
+          )
         ) : (
           <ActivityMap position={position} route={route}/>
         )}
         
         <VoiceMicButton 
-          isAwake={isAwake} 
+          isAwake={isAwake}
           isListening={isListening} 
           volume={volume} 
           hasPermission={isMicPermissionGranted} 
           onPress={() => {
             if (isListening) {
-              // 👈 AGGIUNTO: Chiede la conferma prima di disattivare
               Alert.alert(
                 'Disable voice commands',
                 'Are you sure you want to mute your microphone?',
@@ -156,12 +203,11 @@ export default function ActivityScreen() {
                   { 
                     text: 'Deactivate', 
                     style: 'destructive', 
-                    onPress: () => stopListening() // Disattiva solo se l'utente preme "Disattiva"
+                    onPress: () => stopListening() 
                   }
                 ]
               );
             } else {
-              // Se è già spento, si riattiva immediatamente al primo click
               startListening();
             }
           }}
@@ -169,9 +215,7 @@ export default function ActivityScreen() {
         {!isRunning ? (
           isPermissionGranted === true && (
             <TouchableOpacity 
-              // 1. Aggiungiamo un'opacità ridotta se position è null
               style={[styles.startButton, !position && { opacity: 0.5 }]} 
-              // 2. Disabilitiamo il tocco se position è null
               disabled={!position} 
               onPress={() => { 
                 setIsRunning(true); 
@@ -179,7 +223,6 @@ export default function ActivityScreen() {
                 Vibration.vibrate(1000); 
               }}
             >
-              {/* 3. Opzionale ma consigliato: cambiamo il testo per dare feedback */}
               <Text style={styles.startButtonText}>
                 {!position ? 'Acquiring GPS...' : 'Start Run'}
               </Text>
@@ -265,7 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: colors.background,
+    backgroundColor: '#1f1f36',
   },
   permissionText: {
     color: colors.textSecondary,
@@ -279,6 +322,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 25,
+    width: '80%', 
+    alignItems: 'center',
   },
   settingsButtonText: {
     color: 'white',

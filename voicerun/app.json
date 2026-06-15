@@ -20,7 +20,7 @@
       },
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyClNiNlmFRRlaiEID_0mngAyAbthwnl_3c"
+          "apiKey": ""
         }
       },
       "edgeToEdgeEnabled": true,
@@ -81,7 +81,6 @@
       "eas": {
         "projectId": "bc5fd371-6169-42a9-a573-d36eeff45e34"
       }
-    },
-    "owner": "tempzy"
+    }
   }
 }
