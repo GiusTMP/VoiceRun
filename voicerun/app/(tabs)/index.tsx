@@ -188,6 +188,7 @@ export default function ActivityScreen() {
           <ActivityMap position={position} route={route}/>
         )}
         
+        {/* 🌟 SEZIONE MODIFICATA: Popup di conferma sia per attivazione che per disattivazione */}
         <VoiceMicButton 
           isAwake={isAwake}
           isListening={isListening} 
@@ -208,7 +209,17 @@ export default function ActivityScreen() {
                 ]
               );
             } else {
-              startListening();
+              Alert.alert(
+                'Enable voice commands',
+                'Are you sure you want to activate your microphone to listen for voice commands?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Activate', 
+                    onPress: () => startListening() 
+                  }
+                ]
+              );
             }
           }}
         />

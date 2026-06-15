@@ -27,12 +27,15 @@ export function useTracking(isRunning: boolean) {
   const [distanceKm, setDistanceKm] = useState(0);
   
   const [isPermissionGranted, setIsPermissionGranted] = useState<boolean | null>(null);
-  // Usiamo una ref per tracciare il permesso in modo sincrono e impedire ricaricamenti superflui
+  // Ref per tracciare il permesso in modo sincrono e reattivo
   const isPermGrantedRef = useRef<boolean | null>(null); 
   
   const watchRef = useRef<Location.LocationSubscription | null>(null);
+  
+  // 🌟 FLAG SMART PAUSE: Segnala se il percorso si è interrotto a causa dello spegnimento del GPS o della pausa
+  const isRouteBroken = useRef<boolean>(false);
 
-  // Funzione di utilità per aggiornare stato e ref simultaneamente
+  // Funzione per aggiornare stato e ref simultaneamente
   const updatePermissionState = (granted: boolean) => {
     isPermGrantedRef.current = granted;
     setIsPermissionGranted(granted);
@@ -41,7 +44,7 @@ export function useTracking(isRunning: boolean) {
   useEffect(() => {
     let isMounted = true;
 
-    // Recupera la posizione in modo silenzioso per ripristinare la mappa
+    // Recupera la posizione in modo silenzioso per inizializzare o muovere la mappa
     async function updateLocationSilent() {
       try {
         const current = await Location.getCurrentPositionAsync({
@@ -54,27 +57,28 @@ export function useTracking(isRunning: boolean) {
           });
         }
       } catch (e) {
-        // Ignoriamo gli errori qui per evitare log fastidiosi
+        // Errore ignorato volutamente in background
       }
     }
 
-    // Controlla lo stato generale di permessi e hardware
+    // Controlla lo stato hardware del GPS e i permessi dell'applicazione
     async function checkStatus(shouldRequest = false) {
       try {
-        // 1. Controllo hardware (es. menu a tendina)
+        // 1. Controllo hardware globale (es. scorciatoie/menu a tendina del telefono)
         const servicesEnabled = await Location.hasServicesEnabledAsync();
         if (!servicesEnabled) {
           if (isMounted && isPermGrantedRef.current !== false) {
             updatePermissionState(false);
+            stopWatching(); // Ferma il tracciatore nativo se il chip si spegne
+            isRouteBroken.current = true; // 👈 Attiva il blocco: il GPS è caduto!
           }
           return;
         }
 
-        // 2. Controllo permessi app
+        // 2. Controllo permessi dell'applicazione
         const currentPerm = await Location.getForegroundPermissionsAsync();
         
         if (currentPerm.status === 'granted') {
-          // Se prima eravamo bloccati (es. GPS appena riacceso), sblocca e chiedi subito la posizione
           if (isPermGrantedRef.current === false || isPermGrantedRef.current === null) {
             if (isMounted) updatePermissionState(true);
             await updateLocationSilent();
@@ -90,28 +94,29 @@ export function useTracking(isRunning: boolean) {
         } else {
           if (isMounted && isPermGrantedRef.current !== false) {
             updatePermissionState(false);
+            isRouteBroken.current = true; // Il permesso è stato revocato/manca
           }
         }
       } catch (err) {
         if (isMounted && isPermGrantedRef.current !== false) {
           updatePermissionState(false);
+          isRouteBroken.current = true;
         }
       }
     }
 
-    // Avvio immediato al caricamento
+    // Avvio del controllo al montaggio della schermata
     checkStatus(true);
 
-    // Ascoltatore cambi di stato (quando l'utente esce completamente per andare in Impostazioni)
+    // Gestisce il focus quando l'utente torna dalle impostazioni del telefono
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         checkStatus(false);
       }
     });
 
-    // POLLING: Controllo continuo (ogni 2 secondi) per le disattivazioni al volo (menu a tendina)
+    // POLLING: Monitora ogni 2 secondi lo stato per intercettare i click immediati dal menu a tendina
     const intervalId = setInterval(() => {
-      // Evitiamo controlli se l'app è in background per risparmiare risorse
       if (AppState.currentState === 'active') {
         checkStatus(false);
       }
@@ -120,18 +125,29 @@ export function useTracking(isRunning: boolean) {
     return () => {
       isMounted = false;
       subscription.remove();
-      clearInterval(intervalId); // Pulizia del timer
+      clearInterval(intervalId);
     };
   }, []);
 
+  // 🌟 MODIFICATO: Avvia o stoppa la sessione di rilevamento in base alla corsa (attiva/pausa) e alla presenza del segnale
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && isPermissionGranted) {
       startWatching();
     } else {
       stopWatching();
+      
+      // Se l'utente ha messo in pausa manualmente la corsa
+      if (!isRunning) {
+        isRouteBroken.current = true;
+      }
+      
+      // Se la corsa sta andando ma perdiamo la connessione GPS
+      if (isRunning && !isPermissionGranted) {
+        isRouteBroken.current = true;
+      }
     }
     return () => stopWatching();
-  }, [isRunning]);
+  }, [isRunning, isPermissionGranted]); // <--- Inserito isRunning tra le dipendenze reattive
 
   const startWatching = async () => {
     if (watchRef.current) return; 
@@ -140,7 +156,7 @@ export function useTracking(isRunning: boolean) {
       watchRef.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
-          distanceInterval: 5,
+          distanceInterval: 5, // Notifica ogni 5 metri di movimento rilevato
         },
         (loc) => {
           const newCoord: Coordinate = {
@@ -152,20 +168,32 @@ export function useTracking(isRunning: boolean) {
 
           setRoute((prev) => {
             if (prev.length > 0) {
+              // 🌟 LOGICA SMART PAUSE ANTI-LINEA D'ARIA
+              // Se il flag indica che veniamo da una pausa o da un blackout del GPS, inseriamo il punto
+              // ma saltiamo l'Haversine. In questo modo NON calcola la retta fasulla.
+              if (isRouteBroken.current) {
+                isRouteBroken.current = false; // Resetta il flag perché siamo tornati online stabilmente
+                return [...prev, newCoord]; // Aggiunge la coordinata alla mappa senza incrementare i KM
+              }
+
+              // Calcolo standard della distanza tra l'ultimo punto registrato e quello attuale
               const added = haversine(prev[prev.length - 1], newCoord);
-              if (added > 0.005) { 
+              if (added > 0.005) { // Filtro di rumore (minimo 5 metri di effettivo spostamento)
                 setDistanceKm((d) => d + added);
                 return [...prev, newCoord];
               }
               return prev;
             } 
+            
+            // Primo punto in assoluto della corsa
             return [...prev, newCoord];
           });
         }
       );
     } catch (err) {
-      console.log("Errore durante l'avvio di watchPositionAsync:", err);
+      console.log("Errore nell'avvio di watchPositionAsync:", err);
       updatePermissionState(false);
+      isRouteBroken.current = true;
     }
   };
 
