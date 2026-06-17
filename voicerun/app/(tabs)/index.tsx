@@ -26,7 +26,7 @@ export default function ActivityScreen() {
   
   const { position, route, distanceKm, isPermissionGranted } = useTracking(isRunning && !isPaused); 
   
-  // Stato per capire se il blocco è dovuto ai permessi app o solo al GPS spento
+  // Flag to differentiate app permission os GPS permissions
   const [arePermissionsGranted, setArePermissionsGranted] = useState<boolean | null>(null);
 
   const [resetKey, setResetKey] = useState(0);
@@ -48,7 +48,7 @@ export default function ActivityScreen() {
     }
   }, [distanceKm]);
 
-  // Controlla lo stato reale dei permessi e si aggiorna se l'utente riattiva l'app
+  // Check for permossions edge cases
   useEffect(() => {
     const checkPermissions = async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
@@ -163,7 +163,7 @@ export default function ActivityScreen() {
       <View style={styles.mapContainer}>
         {isPermissionGranted === false && arePermissionsGranted !== null ? (
           arePermissionsGranted ? (
-            // CASO A: I permessi dell'app sono già OK, ma il GPS del telefono è spento
+            // App permissions are fine but GPS isn't
             <View style={styles.permissionContainer}>
               <Ionicons name="location-outline" size={48} color="#ffb74d" style={{ marginBottom: 16 }} />
               <Text style={styles.permissionText}>
@@ -171,14 +171,14 @@ export default function ActivityScreen() {
               </Text>
             </View>
           ) : (
-            // CASO B: Mancano effettivamente le autorizzazioni dell'app
+            // App permissions missing
             <View style={styles.permissionContainer}>
               <Ionicons name="location-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 16 }} />
               <Text style={styles.permissionText}>
                 The app needs location permissions to display the map and track your ride.
               </Text>
               
-              {/* Sotto c'è solo il pulsante per richiedere il permesso nativo */}
+              {/* Grant permissions */}
               <TouchableOpacity style={styles.settingsButton} onPress={handleRequestPermission}>
                 <Text style={styles.settingsButtonText}>Grant Permission</Text>
               </TouchableOpacity>
@@ -187,8 +187,7 @@ export default function ActivityScreen() {
         ) : (
           <ActivityMap position={position} route={route}/>
         )}
-        
-        {/* 🌟 SEZIONE MODIFICATA: Popup di conferma sia per attivazione che per disattivazione */}
+        {/* Confirmation */}
         <VoiceMicButton 
           isAwake={isAwake}
           isListening={isListening} 

@@ -3,23 +3,23 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface VoiceMicButtonProps {
-  isAwake?: boolean; // Mantenuta come opzionale per non rompere index.tsx, ma ignorata visivamente
+  isAwake?: boolean; 
   isListening: boolean;
   volume: number; 
   onPress?: () => void;
-  hasPermission?: boolean; // <-- NUOVA PROP: Traccia lo stato dei permessi del microfono
+  hasPermission?: boolean; 
 }
 
 export default function VoiceMicButton({ 
   isListening, 
   volume, 
   onPress, 
-  hasPermission = true // Di default è true per evitare errori se non passata immediatamente
+  hasPermission = true 
 }: VoiceMicButtonProps) {
   const animatedVolume = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // 1. Animazione a ciclo continuo ad onda (attiva solo se autorizzato)
+  // Animation
   useEffect(() => {
     if (isListening && hasPermission) {
       Animated.loop(
@@ -41,7 +41,7 @@ export default function VoiceMicButton({
     }
   }, [isListening, hasPermission]);
 
-  // 2. Sincronizzazione dinamica reattiva per i decibel audio della voce (attiva solo se autorizzato)
+  
   useEffect(() => {
     Animated.timing(animatedVolume, {
       toValue: (isListening && hasPermission) ? volume : 0,
@@ -67,18 +67,16 @@ export default function VoiceMicButton({
     outputRange: [0.4, 0.2, 0],
   });
 
-  // Determina dinamicamente il nome dell'icona
+  
   const getIconName = () => {
     if (!hasPermission) {
-      return 'mic-off'; // Icona del microfono sbarrato se i permessi sono negati
+      return 'mic-off'; 
     }
     return volume > 0.5 ? 'mic' : 'mic-outline';
   };
 
   return (
     <View style={styles.container}>
-      
-      {/* ONDA 1: Pulsazione continua di base (Solo se autorizzato) */}
       {isListening && hasPermission && (
         <Animated.View
           style={[
@@ -91,8 +89,6 @@ export default function VoiceMicButton({
           ]}
         />
       )}
-
-      {/* ONDA 2: Reattività volumetrica d'ampiezza voce (Solo se autorizzato) */}
       {isListening && hasPermission && (
         <Animated.View
           style={[
