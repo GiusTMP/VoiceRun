@@ -21,8 +21,8 @@ interface VoiceControllerProps {
 type AppIntent = 'START' | 'PAUSE' | 'RESUME' | 'STOP' | 'DISTANCE' | 'TIME' | 'CALORIES' | 'PACE' | 'UNKNOWN';
 
 // Espressioni regolari locali per il controllo e la pulizia sul dispositivo
-const WAKE_WORD_CHECK_REGEX = /(voicerun|voice\s*run|voice\s*runner|boys?\s*run|voice\s*ram)/i;
-const WAKE_WORD_REPLACE_REGEX = /(voicerun|voice\s*run|voice\s*runner|boys?\s*run|voice\s*ram)/gi;
+const WAKE_WORD_CHECK_REGEX = /(voice|voyce|boys?|boy['’]?s|boyce|boice|vice|wise|boss)\s*(run|runner|ran|ron|ram|room|round|rom)/i;
+const WAKE_WORD_REPLACE_REGEX = /(voice|voyce|boys?|boy['’]?s|boyce|boice|vice|wise|boss)\s*(run|runner|ran|ron|ram|room|round|rom)/gi;
 const CONFIRM_YES = /yes|yeah|sure|confirm|do it|ok/i;
 const CONFIRM_NO = /no|cancel|dont|don't|keep running/i;
 
@@ -191,7 +191,7 @@ export function useVoiceController({
     // Risoluzione bug frasi duplicate: prendiamo solo il primo risultato (quello definitivo)
     const text = event.results[0]?.transcript?.toLowerCase().trim() || '';
     setTranscript(text);
-
+    console.log("🗣️ Microfono ha sentito:", text);
     if (!text || text === lastProcessedTextRef.current) return;
 
     // Controllo locale della wake word tramite Regex senza spreco di token
