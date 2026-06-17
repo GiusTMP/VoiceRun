@@ -29,7 +29,6 @@ export default function SummaryScreen() {
         <Text style={styles.info}>{calories} Kcal</Text>
         <Text style={styles.infoTitle}>Calories</Text>
       </View>
-      {/* Torna alla home */}
       <View style={{ height: 1, backgroundColor: 'white', marginVertical: 10, width: '70%', marginBottom: 50 }} />
 
       <TouchableOpacity style={styles.button} onPress={() => router.replace('/history')}>
@@ -53,7 +52,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     backgroundColor: colors.background,
-    paddingTop: 100, //150
+    paddingTop: 100, 
   },
   logo: {
     marginBottom: 20

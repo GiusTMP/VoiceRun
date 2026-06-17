@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function ActivityMap({ position, route }: Props) {
-  // Se la posizione non è ancora pronta, mostra un caricamento pulito senza testo
+  // Loading
   if (!position) {
     return (
       <View style={styles.placeholder}>
@@ -30,7 +30,7 @@ export default function ActivityMap({ position, route }: Props) {
         showsUserLocation
         followsUserLocation  
       >
-        {/* Traccia il percorso */}
+        {/* line on the map */}
         {route.length > 1 && (
           <Polyline
             coordinates={route}
@@ -39,7 +39,7 @@ export default function ActivityMap({ position, route }: Props) {
           />
         )}
 
-        {/* Punto di partenza */}
+        {/* Starting point */}
         {route.length > 0 && (
           <Marker coordinate={route[0]} title="Partenza" pinColor="blue" />
         )}

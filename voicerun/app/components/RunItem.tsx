@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../styles/global';
 
 
-// AGGIUNGERE DISTANZA
+
 type RunItemProps = {
   distance: string;
   duration: string;
@@ -13,7 +13,7 @@ type RunItemProps = {
   onPress?: () => void;
 }
 
-// AGGIUNGERE DISTANZA
+
 export default function RunItem({ 
     distance,
     duration,

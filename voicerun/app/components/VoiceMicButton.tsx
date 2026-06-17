@@ -84,7 +84,7 @@ export default function VoiceMicButton({
             {
               transform: [{ scale: pulseAnim }],
               opacity: pulseOpacity,
-              backgroundColor: '#22c55e', // Verde fisso
+              backgroundColor: '#22c55e', 
             },
           ]}
         />
@@ -96,7 +96,7 @@ export default function VoiceMicButton({
             {
               transform: [{ scale: voiceScale }],
               opacity: voiceOpacity,
-              backgroundColor: '#4ade80', // Verde brillante
+              backgroundColor: '#4ade80', 
               borderWidth: 1.5,
               borderColor: '#22c55e',
             },
@@ -109,8 +109,8 @@ export default function VoiceMicButton({
           styles.button, 
           !hasPermission && styles.buttonDisabled 
         ]} 
-        onPress={onPress} // 👈 Sempre attivo, gestirà il controllo internamente
-        activeOpacity={0.85} // 👈 Sempre attivo per dare un feedback visivo al tocco
+        onPress={onPress} 
+        activeOpacity={0.85} 
       >
         <Ionicons 
           name={getIconName()} 
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#1a1a2e', // Colore scuro standard
+    backgroundColor: '#1a1a2e', 
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   buttonDisabled: {
-    borderColor: '#ef4444', // Aggiunge un bordo rosso per accentuare il blocco del microfono
+    borderColor: '#ef4444', 
     borderWidth: 1.5,
     backgroundColor: '#111122',
   }

@@ -16,7 +16,7 @@ export default function Stopwatch({ isRunning, resetKey, onTick }: StopwatchProp
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
-        setTotalSeconds(prev => prev + 1); // 👈 solo aggiorna lo stato
+        setTotalSeconds(prev => prev + 1); 
       }, 1000);
     }
 
@@ -25,7 +25,7 @@ export default function Stopwatch({ isRunning, resetKey, onTick }: StopwatchProp
     };
   }, [isRunning]);
 
-  // 👇 useEffect separato che chiama onTick quando totalSeconds cambia
+  //On difference seconds
   useEffect(() => {
     onTick?.(totalSeconds);
   }, [totalSeconds]);
