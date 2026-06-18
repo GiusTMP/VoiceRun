@@ -188,13 +188,12 @@ export function useVoiceController({
   useSpeechRecognitionEvent('result', (event) => {
     if (!shouldListenRef.current || isSpeakingRef.current || isAnalyzingRef.current) return;
 
-    // Risoluzione bug frasi duplicate: prendiamo solo il primo risultato (quello definitivo)
     const text = event.results[0]?.transcript?.toLowerCase().trim() || '';
     setTranscript(text);
     console.log("🗣️ Microfono ha sentito:", text);
     if (!text || text === lastProcessedTextRef.current) return;
 
-    // Controllo locale della wake word tramite Regex senza spreco di token
+    // Wake word with REGEX
     const hasWakeWord = WAKE_WORD_CHECK_REGEX.test(text);
 
     if (!hasWakeWord && !isConfirmingStopRef.current) {
@@ -208,7 +207,7 @@ export function useVoiceController({
     debounceTimeoutRef.current = setTimeout(async () => {
       if (!shouldListenRef.current || isSpeakingRef.current || isAnalyzingRef.current) return;
 
-      // Gestione della conferma di stop (Senza passare dall'AI)
+      // Stop confirm
       if (isConfirmingStopRef.current) {
         if (CONFIRM_YES.test(text)) {
           lastProcessedTextRef.current = text;
@@ -224,10 +223,8 @@ export function useVoiceController({
         return; 
       }
 
-      // Rimuoviamo localmente la wake word dal testo prima dell'invio all'AI
       const commandText = text.replace(WAKE_WORD_REPLACE_REGEX, '').trim();
       
-      // Se l'utente ha detto solo la wake word senza comandi, ci fermiamo qui risparmiando la chiamata API
       if (commandText.length < 2) return; 
 
       isAnalyzingRef.current = true;
