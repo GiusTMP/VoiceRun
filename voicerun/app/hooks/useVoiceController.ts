@@ -20,15 +20,13 @@ interface VoiceControllerProps {
 
 type AppIntent = 'START' | 'PAUSE' | 'RESUME' | 'STOP' | 'DISTANCE' | 'TIME' | 'CALORIES' | 'PACE' | 'UNKNOWN';
 
-// Espressioni regolari locali per il controllo e la pulizia sul dispositivo
+// Regex for wake word
 const WAKE_WORD_CHECK_REGEX = /(voice|voyce|boys?|boy['’]?s|boyce|boice|vice|wise|boss)\s*(run|runner|ran|ron|ram|room|round|rom)/i;
 const WAKE_WORD_REPLACE_REGEX = /(voice|voyce|boys?|boy['’]?s|boyce|boice|vice|wise|boss)\s*(run|runner|ran|ron|ram|room|round|rom)/gi;
 const CONFIRM_YES = /yes|yeah|sure|confirm|do it|ok/i;
 const CONFIRM_NO = /no|cancel|dont|don't|keep running/i;
 
-// --- FUNZIONE GROQ AI ULTRA-OTTIMIZZATA (MINIMO CONSUMO TOKEN) ---
 async function analyzeIntentWithAI(cleanedCommand: string): Promise<AppIntent> {
-  // ⚠️ INSERISCI QUI LA TUA API KEY DI GROQ (console.groq.com)
   const API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY; 
   const MODEL = 'llama-3.1-8b-instant'; 
   
@@ -42,12 +40,11 @@ async function analyzeIntentWithAI(cleanedCommand: string): Promise<AppIntent> {
       body: JSON.stringify({
         model: MODEL,
         temperature: 0.1,
-        max_tokens: 15, // Blocco output per risparmiare token
+        max_tokens: 15, 
         response_format: { type: "json_object" }, 
         messages: [
           {
             role: "system",
-            // Prompt ridotto all'60% per risparmiare sui token di sistema a ogni chiamata
             content: `In JSON return ONLY {"intent": "VAL"}.
               Allowed VAL: START, PAUSE, RESUME, STOP, DISTANCE, TIME, CALORIES, PACE, UNKNOWN.
               Acoustic fixes:
@@ -58,7 +55,7 @@ async function analyzeIntentWithAI(cleanedCommand: string): Promise<AppIntent> {
           },
           {
             role: "user",
-            content: cleanedCommand // Mandiamo solo il comando puro, senza wake word
+            content: cleanedCommand 
           }
         ]
       })
