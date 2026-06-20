@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     value: {
         fontSize: 32,
         fontWeight: 'bold',
-        fontVariant: ['tabular-nums'], // 👈 evita che i numeri "ballino"
+        fontVariant: ['tabular-nums'], 
         letterSpacing: 2,
         color: 'white',
     },

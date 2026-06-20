@@ -8,11 +8,13 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
    ```bash
    npm install
-   ```
+   ``` 
    npx expo install react-native-maps expo-location
    npx expo install expo-status-bar
    npx expo install @react-native-async-storage/async-storage
    npx expo install expo-speech
+   npm install expo-speech-recognition@sdk-54
+   npx expo install expo-dev-client
 
 2. Start the app
 
